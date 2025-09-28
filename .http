@@ -1,0 +1,215 @@
+###
+POST http://localhost:3010/accesorios
+Content-Type: application/json
+
+{
+  "title": "New Calzado",
+  "price": "frff",
+  "size": "M",
+  "color": "Rojo",
+  "description": "A new pair of calzado",
+  "genero": 3
+}
+###
+GET http://localhost:3010/calzados/filter?category=calzados&size=40&brand=Nike
+Content-Type: application/json
+###
+DELETE http://localhost:3010/calzados/688478bbc03ef8ba04033d03
+Content-Type: application/json
+###
+PUT http://localhost:3010/ropa/688801dc5570d2fb2044d61c
+Content-Type: application/json
+
+{
+  "category": "ropa",
+  "title": "Camiseta deportiva transpirable",
+  "price": 29.99,
+  "size": ["M", "L"],
+  "brand": "Nike",
+  "description": "Camiseta ideal para entrenamientos intensos. Tecnología Dri-FIT que mantiene la piel seca.",
+  "genero": ["Masculino", "Unisex"],
+  "color": ["Negro", "Gris"],
+  "tipo": ["Camiseta"]
+}
+###
+PATCH http://localhost:3010/ropa/688801dc5570d2fb2044d61c
+Content-Type: application/json
+
+{
+  "title": "EJEMPLO PATCH",
+  "price": 29.99
+}
+
+###
+POST http://localhost:3010/user/register
+Content-Type: application/json
+
+{
+  "mail": "admin@gmail.com",
+  "password": "admin",
+  "name": "admin",
+  "type": "admin"
+}
+
+###
+GET http://localhost:3010/search/?=remera
+Content-Type: application/json
+
+###
+POST http://localhost:3010/user/login
+Content-Type: application/json
+
+{
+  "mail": "roberto@gmail.com",
+  "password": "123"
+}
+
+###
+# Crear producto de ROPA (JSON, sin imagen de portada)
+POST http://localhost:3010/ropa
+Content-Type: application/json
+
+{
+  "title": "Remera Classic",
+  "price": 12990,
+  "brand": "Acme",
+  "genero": ["Unisex"],
+  "types": ["remera", "casual"],
+  "description": "Tela de algodón peinado",
+  "coverImage": null,
+  "variants": [
+    {
+      "color": "Negro",
+      "colorCode": "#000000",
+      "images": [],
+      "sizes": [
+        { "size": "S", "stock": 5 },
+        { "size": "M", "stock": 8 }
+      ]
+    },
+    {
+      "color": "Blanco",
+      "colorCode": "#FFFFFF",
+      "images": [],
+      "sizes": [
+        { "size": "S", "stock": 3 },
+        { "size": "M", "stock": 6 }
+      ]
+    }
+  ]
+}
+### Crear un nuevo tipo
+POST http://localhost:3010/types
+Content-Type: application/json
+
+{
+  "name": "Campera"
+}
+
+### Obtener tipos y marcas de todos los productos (ropa, calzado, accesorios)
+GET http://localhost:3010/ropa/68a7b96cb2d44b687bf051f8
+Content-Type: application/json
+###
+DELETE http://localhost:3010/accesorios/68b4ce5605cd60256cd52e5c
+Content-Type: application/json
+
+###
+POST  http://localhost:3010/user/login
+Content-Type: application/json
+
+{
+  "mail": "streetwear@gmail.com",
+  "password": "larryisreal1"
+}
+###
+POST http://localhost:3010/ropa
+Content-Type: application/json
+
+{
+  "title": "Remera Algodón Importada",
+  "price": 4999.99,
+  "promoPrice": 3999.99,
+  "sku": "REM-ALG-IMP-01",
+  "brand": "Algodonera SA",
+  "brandSlug": "algodonera-sa",
+  "types": ["remera", "importada"],
+  "typeSlugs": ["remera", "importada"],
+  "genero": ["unisex"],
+  "category": "ropa",
+  "coverImage": "https://ejemplo.com/remera.jpg",
+  "description": "Remera importada de algodón premium.",
+  "peso": 0.3,
+  "profundidad": 3,
+  "ancho": 30,
+  "alto": 2
+}
+
+### Agregar una variante a la remera creada (ID: 1)
+POST http://localhost:3010/ropa/1/variants
+Content-Type: application/json
+
+{
+  "color": "Negro",
+  "colorSlug": "negro",
+  "colorCode": "#000000",
+  "images": ["https://ejemplo.com/remera-negra.jpg"],
+  "sku": "REM-ALG-NEG-01",
+  "promoPrice": 3899.99,
+  "sizes": [
+    { "size": "S", "stock": 10, "sku": "REM-ALG-NEG-S" },
+    { "size": "M", "stock": 8, "sku": "REM-ALG-NEG-M" }
+  ]
+}
+
+### Crear un producto completo con variantes y talles
+POST http://localhost:3010/ropa
+Content-Type: application/json
+
+{
+  "title": "Remera Algodón Importada",
+  "price": 4999.99,
+  "promoPrice": 3999.99,
+  "sku": "REM-ALG-IMP-01",
+  "brand": "Algodonera SA",
+  "brandSlug": "algodonera-sa",
+  "types": ["remera", "importada"],
+  "typeSlugs": ["remera", "importada"],
+  "genero": ["unisex"],
+  "category": "ropa",
+  "coverImage": "https://ejemplo.com/remera.jpg",
+  "description": "Remera importada de algodón premium.",
+  "peso": 0.3,
+  "profundidad": 3,
+  "ancho": 30,
+  "alto": 2,
+
+  "variants": [
+    {
+      "color": "Negro",
+      "colorSlug": "negro",
+      "colorCode": "#000000",
+      "images": ["https://ejemplo.com/remera-negra.jpg"],
+      "sku": "REM-ALG-NEG-01",
+      "promoPrice": 3899.99,
+      "sizes": [
+        { "size": "S", "stock": 10, "sku": "REM-ALG-NEG-S" },
+        { "size": "M", "stock": 8,  "sku": "REM-ALG-NEG-M" }
+      ]
+    },
+    {
+      "color": "Blanco",
+      "colorSlug": "blanco",
+      "colorCode": "#FFFFFF",
+      "images": ["https://ejemplo.com/remera-blanca.jpg"],
+      "sku": "REM-ALG-BLA-01",
+      "promoPrice": 3799.99,
+      "sizes": [
+        { "size": "S", "stock": 5, "sku": "REM-ALG-BLA-S" },
+        { "size": "L", "stock": 12, "sku": "REM-ALG-BLA-L" }
+      ]
+    }
+  ]
+}
+### 🟢 Filtrar combinado (ropa femenina, marca Adidas, talla 42)
+GET http://localhost:3010/filter?category=ropa&genero=femenino&brand=Topper&size=L
+Accept: application/json
