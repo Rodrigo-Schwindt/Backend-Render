@@ -43,8 +43,8 @@ export class UserController {
 
       res.cookie('user-token', token, {
         httpOnly: false,
-        secure: false,
-        sameSite: 'lax',
+        secure: true, 
+        sameSite: 'none',
         maxAge: 1000 * 60 * 60 * 24
       });
 
@@ -82,8 +82,8 @@ export class UserController {
 
       res.cookie('user-token', token, {
         httpOnly: false,
-        secure: false,
-        sameSite: 'lax',
+        secure: true, 
+        sameSite: 'none',
         maxAge: 1000 * 60 * 60 * 24
       });
 
@@ -172,8 +172,8 @@ export class UserController {
     try {
       res.clearCookie('user-token', {
         httpOnly: false,
-        secure: false,
-        sameSite: 'lax',
+        secure: true, 
+        sameSite: 'none',
         path: '/'
       });
       res.status(200).json({
