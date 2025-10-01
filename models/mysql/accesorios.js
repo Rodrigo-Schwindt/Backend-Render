@@ -165,56 +165,47 @@ export class Accesorios {
 
   // Crear accesorio (con variantes y talles)
 static async CreateAccesorios(data) {
-  // Normalizamos los campos que deben ser arrays
-  const types = normalizeToArray(data.types);
-  const typeSlugs = types.map(type => slugify(type));
-  const genero = normalizeToArray(data.genero);
+  // Normalizamos los campos que deben ser arrays
+  const types = normalizeToArray(data.types);
+  const typeSlugs = types.map(type => slugify(type));
+  const genero = normalizeToArray(data.genero);
 
-  const { variants, ...base } = data;
+  const { variants, ...base } = data;
 
-  // Crear el producto con los arrays normalizados
-  const product = await Product.create({
-    ...base,
-    category: "accesorios",
-    types,
-    typeSlugs,
-    genero,
-    // Si hay brand, también generar brandSlug
-    ...(data.brand && { brandSlug: slugify(data.brand) })
-  });
+  // Crear el producto con los arrays normalizados
+  const product = await Product.create({
+    ...base,
+    category: "accesorios",
+    types,
+    typeSlugs,
+    genero,
+    // Si hay brand, también generar brandSlug
+    ...(data.brand && { brandSlug: slugify(data.brand) })
+  });
 
-  if (Array.isArray(variants)) {
-    for (const variant of variants) {
-      const { sizes, ...restVariant } = variant;
+  if (Array.isArray(variants)) {
+    for (const variant of variants) {
+      const { sizes, ...restVariant } = variant;
 
-      // 🔹 Normalizar imágenes ANTES de guardar
-      let images = [];
-      if (typeof restVariant.images === "string") {
-        try {
-          images = JSON.parse(restVariant.images);
-        } catch {
-          images = [restVariant.images];
-        }
-      } else if (Array.isArray(restVariant.images)) {
-        images = restVariant.images;
-      }
+      // 🔹 CAMBIO CLAVE: Normalizamos imágenes, asumiendo que ya son un array de URLs de Cloudinary
+      let images = Array.isArray(restVariant.images) ? restVariant.images : [];
 
-      const nuevaVariante = await Variant.create({
-        ...restVariant,
-        images,
-        colorSlug: slugify(variant.color),
-        productId: product.id
-      });
+      const nuevaVariante = await Variant.create({
+        ...restVariant,
+        images, // Ya es un array de URLs de string
+        colorSlug: slugify(variant.color),
+        productId: product.id
+      });
 
-      if (Array.isArray(sizes)) {
-        for (const sz of sizes) {
-          await Size.create({ ...sz, variantId: nuevaVariante.id });
-        }
-      }
-    }
-  }
+      if (Array.isArray(sizes)) {
+        for (const sz of sizes) {
+          await Size.create({ ...sz, variantId: nuevaVariante.id });
+        }
+      }
+    }
+  }
 
-  return this.GetAccesoriosForID(product.id);
+  return this.GetAccesoriosForID(product.id);
 }
 
   static async UpdateAccesorios(data, id) {

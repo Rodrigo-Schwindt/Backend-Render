@@ -1,5 +1,3 @@
-import path from "path";
-import fs from "fs/promises";
 import { Calzados } from "../../models/mysql/calzados.js";
 
 function toArray(val) {
@@ -56,33 +54,25 @@ function normalizeIncomingBody(raw = {}) {
     }
   }
 
-  if (Array.isArray(body.variants)) {
-    body.variants = body.variants.map((v) => {
-      // 🔹 Normalizar imágenes de cada variante
-      let images = [];
-      if (typeof v.images === "string") {
-        try {
-          images = JSON.parse(v.images);
-        } catch {
-          images = [v.images];
-        }
-      } else if (Array.isArray(v.images)) {
-        images = v.images;
-      }
-
-      return {
-        ...v,
-        images,
-        sizes: Array.isArray(v.sizes)
-          ? v.sizes.map((s) => ({
-              size: String(s.size),
-              stock: Number(s.stock ?? 0),
-              ...(s.sku ? { sku: String(s.sku) } : {}),
-            }))
-          : [],
-      };
-    });
-  }
+  if (Array.isArray(body.variants)) {
+    body.variants = body.variants.map((v) => {
+      // 🔹 Normalizar imágenes de cada variante
+      // Asumimos que si viene es un array, o lo hacemos uno vacío si no.
+      let images = Array.isArray(v.images) ? v.images : []; 
+      
+      return {
+        ...v,
+        images, // Ya es un array
+        sizes: Array.isArray(v.sizes)
+          ? v.sizes.map((s) => ({
+              size: String(s.size),
+              stock: Number(s.stock ?? 0),
+              ...(s.sku ? { sku: String(s.sku) } : {}),
+            }))
+          : [],
+      };
+    });
+  }
 
   return body;
 }

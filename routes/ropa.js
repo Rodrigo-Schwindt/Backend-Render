@@ -2,11 +2,12 @@ import { Router } from "express";
 import { ropaController } from "../controllers/mysql/ropa.js";
 import { 
   uploadProductWithVariants, 
-  processProductImages,
+  // Eliminamos processProductImages
   uploadSingle, 
-  processImage, 
+  // Eliminamos processImage
   uploadMultiple, 
-  processImages 
+  // Eliminamos processImages
+  extractCloudinaryUrls, // <--- CAMBIO CLAVE: Importamos el nuevo extractor
 } from "../middleware/upload.js";
 
 const routeForRopa = Router();
@@ -18,19 +19,35 @@ routeForRopa.get("/types-brands", ropaController.getTypesBrands);
 routeForRopa.get("/:id", ropaController.getById);
 
 // Crear producto (con variantes e imágenes múltiples)
-routeForRopa.post('/', uploadProductWithVariants, processProductImages, ropaController.create);
+routeForRopa.post('/', 
+  uploadProductWithVariants, 
+  extractCloudinaryUrls, // <--- Usamos el nuevo middleware
+  ropaController.create
+);
 
 // Actualizar producto (PATCH unificado)
-routeForRopa.patch("/:id", uploadSingle, processImage, ropaController.update);
+routeForRopa.patch("/:id", 
+  uploadSingle, 
+  extractCloudinaryUrls, // <--- Usamos el nuevo middleware
+  ropaController.update
+);
 
 // Reemplazar un producto (PUT)
-routeForRopa.put("/:id", uploadSingle, processImage, ropaController.replace);
+routeForRopa.put("/:id", 
+  uploadSingle, 
+  extractCloudinaryUrls, // <--- Usamos el nuevo middleware
+  ropaController.replace
+);
 
 routeForRopa.delete("/:id", ropaController.delete);
 
 // Rutas de variantes
 routeForRopa.post("/:id/variants", ropaController.addVariant);
-routeForRopa.post("/:id/variants/:color/images", uploadMultiple, processImages, ropaController.addVariantImages);
+routeForRopa.post("/:id/variants/:color/images", 
+  uploadMultiple, 
+  extractCloudinaryUrls, // <--- Usamos el nuevo middleware
+  ropaController.addVariantImages
+);
 routeForRopa.post("/:id/variants/increment", ropaController.incrementStock);
 routeForRopa.post("/:id/variants/decrement", ropaController.decrementStock);
 routeForRopa.put("/:id/variants/:color", ropaController.updateVariant);

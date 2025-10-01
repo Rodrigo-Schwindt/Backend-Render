@@ -184,16 +184,7 @@ static async CreateRopa(data) {
       const { sizes, ...restVariant } = variant;
 
       // 🔹 Normalizar imágenes ANTES de guardar
-      let images = [];
-      if (typeof restVariant.images === "string") {
-        try {
-          images = JSON.parse(restVariant.images);
-        } catch {
-          images = [restVariant.images];
-        }
-      } else if (Array.isArray(restVariant.images)) {
-        images = restVariant.images;
-      }
+      let images = Array.isArray(restVariant.images) ? restVariant.images : [];
 
       const nuevaVariante = await Variant.create({
         ...restVariant,
