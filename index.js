@@ -9,6 +9,8 @@ import  routeForCalzados  from "./routes/calzados.js";
 import  routeForRopa  from "./routes/ropa.js";
 import { routeForUser } from "./routes/user.js";
 import productosRoutes from "./routes/filter.products.js";
+import mpRoutes from './routes/mercadopago.js';
+
 //import { routeForAndreani, andreaniRoute } from "./routes/andreani.js";
 
 dotenv.config();
@@ -39,6 +41,7 @@ export function createApp() {
   app.use("/accesorios", routeForAccesorios);
   app.use("/user", routeForUser);
   app.use("/filter", productosRoutes);
+  app.use('/api/payments', mpRoutes); 
   //app.use("/andreani", routeForAndreani);
 
   // 404
