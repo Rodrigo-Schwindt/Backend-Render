@@ -1,15 +1,19 @@
 // routes/mercadopago.js
 
 import express from 'express';
-// Importa ambos controladores
-import { createPreference, receiveWebhook } from '../controllers/mercadopago.js'; 
+// ✅ IMPORTANTE: Ahora importamos processPayment
+import { createPreference, processPayment, receiveWebhook } from '../controllers/mercadopago.js'; 
 
 const mpRoutes = express.Router();
 
-// Ruta para crear la preferencia (llamada por el Front-end)
+// 1. Ruta para crear la preferencia (Checkout Pro/Redirect)
 mpRoutes.post('/create-preference', createPreference);
 
-// 🚨 NUEVA RUTA: Ruta para recibir notificaciones (llamada por Mercado Pago)
+// 2. ✅ NUEVA RUTA: Ruta para procesar el pago (Usada por el Payment Brick en el Frontend)
+// El Payment Brick enviará aquí los datos tokenizados de la tarjeta.
+mpRoutes.post('/process', processPayment);
+
+// 3. Ruta para recibir notificaciones (Webhook de Mercado Pago)
 mpRoutes.post('/webhook', receiveWebhook);
 
 export default mpRoutes;

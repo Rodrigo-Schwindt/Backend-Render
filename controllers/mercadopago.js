@@ -23,7 +23,7 @@ function setupMercadoPago() {
                 accessToken: MP_ACCESS_TOKEN,
                 options: {
                     timeout: 5000,
-                    idempotencyKey: 'unique-key'
+                    // Eliminamos 'idempotencyKey' aquí ya que es mejor gestionarla por request si es necesario
                 }
             });
 
@@ -52,7 +52,7 @@ const checkSDK = (res) => {
     return true;
 };
 
-// Controlador para crear la preferencia
+// --- CONTROLADOR EXISTENTE: CREAR PREFERENCIA (PARA CHECKOUT PRO) ---
 export const createPreference = async (req, res) => {
     // Esperar la inicialización
     if (initializationPromise) {
@@ -76,7 +76,7 @@ export const createPreference = async (req, res) => {
     }));
 
     try {
-        const preferenceData = {
+        const preferenceBody = { // Renombrado a 'preferenceBody' para mayor claridad
             items: mp_items,
             payer: {
                 email: customer.email,
@@ -93,7 +93,7 @@ export const createPreference = async (req, res) => {
         };
 
         // ✅ Usar el cliente de preferencias
-        const response = await preferenceClient.create({ body: preferenceData });
+        const response = await preferenceClient.create({ body: preferenceBody });
 
         res.status(200).json({ preferenceId: response.id });
 
@@ -103,6 +103,73 @@ export const createPreference = async (req, res) => {
     }
 };
 
+// --- CONTROLADOR NUEVO: PROCESAR PAGO (PARA PAYMENT BRICK) ---
+export const processPayment = async (req, res) => {
+    // 🌟 Esperar inicialización
+    if (initializationPromise) {
+        try {
+            await initializationPromise;
+        } catch (e) {
+            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+        }
+    }
+
+    if (!checkSDK(res)) return;
+
+    try {
+        // Los datos vienen directamente del frontend (Payment Brick)
+        const { 
+            paymentMethodId, 
+            token, 
+            issuerId, 
+            transactionAmount, 
+            installments, 
+            payerEmail, 
+            orderId // Este campo debe ser enviado por tu frontend
+        } = req.body;
+
+        const paymentBody = {
+            transaction_amount: transactionAmount,
+            token: token,
+            description: 'Compra de Clave Streetwear', // Usa una descripción estática o dinámica
+            installments: installments,
+            payment_method_id: paymentMethodId,
+            issuer_id: issuerId,
+            payer: {
+                email: payerEmail,
+            },
+            // Asegura que tienes la referencia para el Webhook
+            external_reference: orderId || `brick-ref-${Date.now()}`,
+            notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
+        };
+
+        // 🚨 Llamamos a paymentClient para crear el pago
+        const response = await paymentClient.create({ body: paymentBody });
+
+        // 🚀 Respuesta al frontend del Payment Brick
+        res.status(201).json({
+            id: response.id,
+            status: response.status,
+            detail: response.status_detail,
+        });
+
+    } catch (error) {
+        console.error("❌ Error al procesar pago con Payment Brick:", error);
+
+        // Manejo de errores detallado
+        const status = error.status || 500;
+        const message = error.message || "Error interno al procesar el pago.";
+        
+        res.status(status).json({ 
+            error: message,
+            // Proporciona detalles específicos si Mercado Pago los devuelve
+            mp_error: error.cause && error.cause.length > 0 ? error.cause[0].description : 'Error desconocido de MP'
+        });
+    }
+};
+
+
+// --- CONTROLADOR EXISTENTE: WEBHOOK ---
 export const receiveWebhook = async (req, res) => {
     // Esperar la inicialización
     if (initializationPromise) {
