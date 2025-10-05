@@ -1,163 +1,160 @@
 // src/controllers/mercadopago.js
 
-let mp; // 🌟 Variable global para la librería/instancia de Mercado Pago
-let initializationPromise; // Almacena la promesa de inicialización
+import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 
-// Función para inicializar el SDK de Mercado Pago de forma segu
+let client; // Cliente configurado de Mercado Pago
+let preferenceClient; // Cliente para manejar preferencias
+let paymentClient; // Cliente para manejar pagos
+let initializationPromise;
+
+// Función para inicializar el SDK de Mercado Pago
 function setupMercadoPago() {
-    // 🌟 1. Creamos y almacenamos la promesa
-    initializationPromise = (async () => {
-        try {
-            // Importación dinámica y obtención del módulo principal
-            const mercadopagoModule = await import('mercadopago');
-            
-            // 🚨 CORRECCIÓN CLAVE: Asignamos el módulo exportado o su default
-            mp = mercadopagoModule.default || mercadopagoModule; 
-            
-            const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN; 
+    initializationPromise = (async () => {
+        try {
+            const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 
-            if (!MP_ACCESS_TOKEN) {
-                console.error("❌ ERROR: MP_ACCESS_TOKEN no está definido.");
-            } else {
-                // ✅ Configuración estática, que es el patrón que tu librería espera
-                if (typeof mp.configure === 'function') {
-                    mp.configure({
-                        access_token: MP_ACCESS_TOKEN 
-                    });
-                    console.log("✅ SDK de Mercado Pago configurado exitosamente.");
-                } else {
-                    console.error("❌ ERROR: El objeto de Mercado Pago no tiene el método 'configure'. Revisar la versión de la librería.");
-                    throw new Error("Objeto MP inválido."); 
-                }
-            }
-            return mp; // Retornamos el objeto mp
-        } catch (error) {
-            console.error("Error al inicializar el SDK de Mercado Pago:", error);
-            // Esto asegura que la promesa no se quede pendiente si falla
-            throw new Error("Fallo en la inicialización del SDK de MP."); 
-        }
-    })(); // La ejecutamos inmediatamente
+            if (!MP_ACCESS_TOKEN) {
+                console.error("❌ ERROR: MP_ACCESS_TOKEN no está definido.");
+                throw new Error("MP_ACCESS_TOKEN no configurado");
+            }
+
+            // ✅ Configuración moderna del SDK (v2.0+)
+            client = new MercadoPagoConfig({
+                accessToken: MP_ACCESS_TOKEN,
+                options: {
+                    timeout: 5000,
+                    idempotencyKey: 'unique-key'
+                }
+            });
+
+            // Inicializar los clientes específicos
+            preferenceClient = new Preference(client);
+            paymentClient = new Payment(client);
+
+            console.log("✅ SDK de Mercado Pago configurado exitosamente.");
+            return true;
+        } catch (error) {
+            console.error("❌ Error al inicializar el SDK de Mercado Pago:", error);
+            throw new Error("Fallo en la inicialización del SDK de MP.");
+        }
+    })();
 }
 
-// 2. Llamada a la función de configuración (se ejecuta al iniciar el servidor)
+// Llamada a la función de configuración
 setupMercadoPago();
 
-// Función de validación (chequea mp)
+// Función de validación
 const checkSDK = (res) => {
-    if (!mp) { // Usamos 'mp'
-        // Si llegamos aquí es que falló la inicialización (el catch de la promesa)
-        res.status(503).json({ error: "El servicio de pagos aún no está disponible." });
-        return false;
-    }
-    return true;
+    if (!client || !preferenceClient || !paymentClient) {
+        res.status(503).json({ error: "El servicio de pagos aún no está disponible." });
+        return false;
+    }
+    return true;
 };
 
-// 3. Controlador para crear la preferencia
+// Controlador para crear la preferencia
 export const createPreference = async (req, res) => {
-    // 🌟 ESPERAMOS la inicialización antes de continuar
-    if (initializationPromise) {
-        try {
-            await initializationPromise;
-        } catch (e) {
-            // Si la promesa falló (ej. error de importación), enviamos 503
-            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
-        }
-    }
-    
-    if (!checkSDK(res)) return; 
+    // Esperar la inicialización
+    if (initializationPromise) {
+        try {
+            await initializationPromise;
+        } catch (e) {
+            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+        }
+    }
 
-    const { items, customer, shipping_cost, order_id } = req.body; 
+    if (!checkSDK(res)) return;
 
-    // Mapear los ítems del carrito al formato que espera Mercado Pago
-    const mp_items = items.map(item => ({
-        title: item.title,
-        unit_price: Number(item.price),
-        quantity: Number(item.quantity),
-        currency_id: "ARS" 
-    }));
+    const { items, customer, shipping_cost, order_id } = req.body;
 
-    try {
-        const preference = {
-            items: mp_items,
-            payer: {
-                email: customer.email,
-                name: customer.name
-            },
-            back_urls: {
-                success: "https://clancestreetwear.in/checkout/success", 
-                failure: "https://clancestreetwear.in/checkout/failure",
-                pending: "https://clancestreetwear.in/checkout/pending"
-            },
-            notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`, 
-            auto_return: "approved", 
-            external_reference: order_id || `temp-ref-${Date.now()}`
-        };
+    // Mapear los ítems del carrito
+    const mp_items = items.map(item => ({
+        title: item.title,
+        unit_price: Number(item.price),
+        quantity: Number(item.quantity),
+        currency_id: "ARS"
+    }));
 
-        // ✅ Usamos 'mp'
-        const response = await mp.preferences.create(preference);
-        
-        res.status(200).json({ preferenceId: response.body.id });
+    try {
+        const preferenceData = {
+            items: mp_items,
+            payer: {
+                email: customer.email,
+                name: customer.name
+            },
+            back_urls: {
+                success: "https://clancestreetwear.in/checkout/success",
+                failure: "https://clancestreetwear.in/checkout/failure",
+                pending: "https://clancestreetwear.in/checkout/pending"
+            },
+            notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
+            auto_return: "approved",
+            external_reference: order_id || `temp-ref-${Date.now()}`
+        };
 
-    } catch (error) {
-        console.error("Error al crear la preferencia de MP:", error);
-        res.status(500).json({ error: "No se pudo crear la preferencia de pago." });
-    }
+        // ✅ Usar el cliente de preferencias
+        const response = await preferenceClient.create({ body: preferenceData });
+
+        res.status(200).json({ preferenceId: response.id });
+
+    } catch (error) {
+        console.error("❌ Error al crear la preferencia de MP:", error);
+        res.status(500).json({ error: "No se pudo crear la preferencia de pago." });
+    }
 };
 
 export const receiveWebhook = async (req, res) => {
-    // 🌟 ESPERAMOS la inicialización antes de continuar
-    if (initializationPromise) {
-        try {
-            await initializationPromise;
-        } catch (e) {
-            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
-        }
-    }
-    
-    if (!checkSDK(res)) return; // 🌟 Validación del SDK
+    // Esperar la inicialización
+    if (initializationPromise) {
+        try {
+            await initializationPromise;
+        } catch (e) {
+            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+        }
+    }
 
-    // ⚠️ Responder inmediatamente para confirmar recepción
-    res.status(204).send(); 
+    if (!checkSDK(res)) return;
 
-    // Obtener la información de la notificación
-    const topic = req.query.topic || req.query.type;
-    const resourceId = req.query.id || req.query['data.id'];
+    // Responder inmediatamente
+    res.status(204).send();
 
-    if (!topic || !resourceId) {
-        return; 
-    }
+    const topic = req.query.topic || req.query.type;
+    const resourceId = req.query.id || req.query['data.id'];
 
-    try {
-        let paymentData;
+    if (!topic || !resourceId) {
+        return;
+    }
 
-        // Si el topic es 'payment', obtenemos la información del pago
-        if (topic === 'payment') {
-            // ✅ Usamos 'mp'
-            const response = await mp.payment.get(resourceId);
-            paymentData = response.body;
+    try {
+        let paymentData;
 
-        } else if (topic === 'merchant_order') {
-             return;
-        }
+        if (topic === 'payment') {
+            // ✅ Usar el cliente de pagos
+            const response = await paymentClient.get({ id: resourceId });
+            paymentData = response;
 
-        if (paymentData) {
-            const status = paymentData.status;
-            const externalReference = paymentData.external_reference; 
+        } else if (topic === 'merchant_order') {
+            return;
+        }
 
-            console.log(`Pago recibido. ID: ${paymentData.id}, Estado: ${status}, Ref: ${externalReference}`);
-            
-            if (status === 'approved') {
-                console.log(`✅ Pago aprobado. Procediendo a actualizar DB y stock para el pedido: ${externalReference}`);
-                // [TUS FUNCIONES DE BASE DE DATOS AQUÍ]
-                
-            } else if (status === 'rejected' || status === 'cancelled') {
-                console.log(`❌ Pago rechazado/cancelado para el pedido: ${externalReference}`);
+        if (paymentData) {
+            const status = paymentData.status;
+            const externalReference = paymentData.external_reference;
 
-            } else if (status === 'in_process') {
-                console.log(`⚠️ Pago en proceso (pendiente) para el pedido: ${externalReference}`);
-            }
-        }
-    } catch (error) {
-        console.error("Error al procesar webhook de MP:", error);
-    }
+            console.log(`💳 Pago recibido. ID: ${paymentData.id}, Estado: ${status}, Ref: ${externalReference}`);
+
+            if (status === 'approved') {
+                console.log(`✅ Pago aprobado. Procediendo a actualizar DB y stock para el pedido: ${externalReference}`);
+                // [TUS FUNCIONES DE BASE DE DATOS AQUÍ]
+
+            } else if (status === 'rejected' || status === 'cancelled') {
+                console.log(`❌ Pago rechazado/cancelado para el pedido: ${externalReference}`);
+
+            } else if (status === 'in_process') {
+                console.log(`⚠️ Pago en proceso (pendiente) para el pedido: ${externalReference}`);
+            }
+        }
+    } catch (error) {
+        console.error("❌ Error al procesar webhook de MP:", error);
+    }
 };
