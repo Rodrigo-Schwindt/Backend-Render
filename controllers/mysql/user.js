@@ -123,12 +123,20 @@ export class UserController {
     }
   };
 
-  resendVerification = async (req, res) => {
-    try {
-      const { mail } = req.body;
-      if (!mail) return res.status(400).json({ message: 'Mail requerido' });
+  resendVerification = async (req, res) => {
+    try {
+      const { mail } = req.body;
+      if (!mail) return res.status(400).json({ message: 'Mail requerido' });
 
-      const payload = await this.model.resendVerification(mail);
+      const payload = await this.model.resendVerification(mail);
+      
+      // 🌟 DIAGNÓSTICO CLAVE 🌟
+      console.log('Payload de verificación:', payload); 
+
+      // 🌟 MANEJO DE NO ENCONTRADO 🌟
+      if (!payload) {
+          return res.status(404).json({ message: "Usuario no encontrado o ya verificado" });
+      }
 
       const verifyUrl = `${process.env.FRONTEND_URL}/verify?token=${payload.verificationToken}`;
       await sendMail({
