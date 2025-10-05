@@ -1,4 +1,8 @@
-import * as mercadopago from 'mercadopago'; 
+// src/controllers/mercadopago.js
+
+// 🚨 MODIFICACIÓN: Usamos require() para asegurar que la importación funcione.
+const mercadopago = require('mercadopago');
+
 // Asume que obtienes el token de Render/tu .env
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN; 
 
@@ -17,14 +21,14 @@ export const createPreference = async (req, res) => {
         title: item.title,
         unit_price: Number(item.price),
         quantity: Number(item.quantity),
-        currency_id: "ARS" // O la moneda que uses
+        currency_id: "ARS" 
     }));
 
     try {
         const preference = {
             items: mp_items,
             
-            // Opcional: información del comprador si la tienes
+            // Información del comprador
             payer: {
                 email: customer.email,
                 name: customer.name
@@ -32,33 +36,31 @@ export const createPreference = async (req, res) => {
             
             // URLs a dónde redirigir al cliente después de la compra
             back_urls: {
-                success: "https://clancestreetwear.in/checkout/success", // Tu Front-end, si fuera un redirect
+                success: "https://clancestreetwear.in/checkout/success", 
                 failure: "https://clancestreetwear.in/checkout/failure",
                 pending: "https://clancestreetwear.in/checkout/pending"
             },
-            // Una URL para que Mercado Pago notifique a tu Backend del estado del pago
-            notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`, // Importante para actualizar el stock
+            // URL para que Mercado Pago notifique a tu Backend del estado del pago
+            // Asegúrate que process.env.BACKEND_URL es la URL de tu servicio Render.
+            notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`, 
 
-            auto_return: "approved", // Opcional: regresa automáticamente si el pago es aprobado
-            external_reference: order_id || 'random-id-para-seguimiento'
+            auto_return: "approved", 
+            external_reference: order_id || `temp-ref-${Date.now()}` // Fallback para external_reference
         };
 
         const response = await mercadopago.preferences.create(preference);
         
-        // Enviamos el ID de la preferencia al Front-end. El Front-end lo usará para renderizar el Brick.
+        // Enviamos el ID de la preferencia al Front-end.
         res.status(200).json({ preferenceId: response.body.id });
 
     } catch (error) {
         console.error("Error al crear la preferencia de MP:", error);
         res.status(500).json({ error: "No se pudo crear la preferencia de pago." });
     }
-    
 };
+
 export const receiveWebhook = async (req, res) => {
-    // ⚠️ Mercado Pago espera recibir solo un status 200/204 para confirmar que recibiste la notificación.
-    // El proceso de validación y actualización de la DB debe ser asíncrono.
-    
-    // Lo esencial: responder inmediatamente
+    // ⚠️ Responder inmediatamente para confirmar recepción
     res.status(204).send(); 
 
     // Obtener la información de la notificación
@@ -66,7 +68,6 @@ export const receiveWebhook = async (req, res) => {
     const resourceId = req.query.id || req.query['data.id'];
 
     if (!topic || !resourceId) {
-        // Ignoramos peticiones mal formadas
         return; 
     }
 
@@ -79,10 +80,8 @@ export const receiveWebhook = async (req, res) => {
             paymentData = response.body;
 
         } else if (topic === 'merchant_order') {
-            // Este topic se usa a veces para pagos en efectivo/cuotas, si lo necesitas
-            // const response = await mercadopago.merchant_orders.get(resourceId);
-            // paymentData = response.body;
-            return; // Por ahora, nos enfocaremos en 'payment'
+             // Puedes dejar esto comentado o manejarlo si necesitas órdenes compuestas
+             return;
         }
 
         if (paymentData) {
@@ -91,27 +90,18 @@ export const receiveWebhook = async (req, res) => {
 
             console.log(`Pago recibido. ID: ${paymentData.id}, Estado: ${status}, Ref: ${externalReference}`);
 
-            // 🌟🌟🌟 LÓGICA CLAVE 🌟🌟🌟
+            // 🌟🌟🌟 LÓGICA CLAVE (A CONECTAR CON MYSQL) 🌟🌟🌟
             
             if (status === 'approved') {
-                // Lógica: 
-                // 1. Buscar el pedido/carrito en tu MySQL usando el externalReference.
-                // 2. Actualizar el estado del pedido a 'pagado' en MySQL.
-                // 3. Descontar el stock de tus productos.
-                // 4. Enviar un correo de confirmación al cliente.
+                // Lógica: 1. Buscar el pedido/carrito en tu MySQL usando externalReference. 2. Actualizar estado a 'pagado'. 3. Descontar stock. 4. Email.
                 console.log(`✅ Pago aprobado. Procediendo a actualizar DB y stock para el pedido: ${externalReference}`);
-                // await updateOrderStatus(externalReference, 'Aprobado'); // Tu función de DB
-                // await updateProductStock(externalReference); // Tu función de DB
+                // [TUS FUNCIONES DE BASE DE DATOS AQUÍ]
                 
             } else if (status === 'rejected' || status === 'cancelled') {
-                // Lógica: 
-                // 1. Marcar el pedido como 'fallido' en MySQL.
-                console.log(`❌ Pago rechazado para el pedido: ${externalReference}`);
+                console.log(`❌ Pago rechazado/cancelado para el pedido: ${externalReference}`);
 
             } else if (status === 'in_process') {
-                 // Lógica: 
-                // 1. Marcar el pedido como 'pendiente' en MySQL (ej. pago en efectivo Rapipago/Pago Fácil).
-                console.log(`⚠️ Pago en proceso para el pedido: ${externalReference}`);
+                console.log(`⚠️ Pago en proceso (pendiente) para el pedido: ${externalReference}`);
             }
         }
     } catch (error) {
