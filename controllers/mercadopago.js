@@ -3,7 +3,7 @@
 let mp; // 🌟 Variable global para la librería/instancia de Mercado Pago
 let initializationPromise; // Almacena la promesa de inicialización
 
-// Función para inicializar el SDK de Mercado Pago de forma segura
+// Función para inicializar el SDK de Mercado Pago de forma segu
 function setupMercadoPago() {
     // 🌟 1. Creamos y almacenamos la promesa
     initializationPromise = (async () => {
