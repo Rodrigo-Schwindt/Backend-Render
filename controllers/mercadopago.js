@@ -1,4 +1,4 @@
-import mercadopago from 'mercadopago';
+import * as mercadopago from 'mercadopago'; 
 // Asume que obtienes el token de Render/tu .env
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN; 
 
