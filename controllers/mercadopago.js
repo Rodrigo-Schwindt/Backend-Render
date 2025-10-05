@@ -1,35 +1,36 @@
 // src/controllers/mercadopago.js
 
-let mpInstance; // 🌟 Usamos esta variable para la instancia configurada
-let initializationPromise; 
+let mp; // 🌟 Variable global para la librería/instancia de Mercado Pago
+let initializationPromise; // Almacena la promesa de inicialización
 
 // Función para inicializar el SDK de Mercado Pago de forma segura
 function setupMercadoPago() {
     // 🌟 1. Creamos y almacenamos la promesa
     initializationPromise = (async () => {
         try {
-            // Importación dinámica del módulo
+            // Importación dinámica y obtención del módulo principal
             const mercadopagoModule = await import('mercadopago');
-            
-            // 🚨 CAMBIO CLAVE: Obtener el constructor/clase.
-            // La librería de MP exporta la clase principal para ser instanciada.
-            const MercadoPago = mercadopagoModule.default || mercadopagoModule;
+            
+            // 🚨 CORRECCIÓN CLAVE: Asignamos el módulo exportado o su default
+            mp = mercadopagoModule.default || mercadopagoModule; 
             
             const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN; 
 
             if (!MP_ACCESS_TOKEN) {
                 console.error("❌ ERROR: MP_ACCESS_TOKEN no está definido.");
             } else {
-                // 🚨 CORRECCIÓN: Instanciamos la clase de Mercado Pago
-                // La configuración del token se pasa directamente al constructor.
-                mpInstance = new MercadoPago({
-                    access_token: MP_ACCESS_TOKEN 
-                });
-                
-                console.log("✅ SDK de Mercado Pago configurado exitosamente.");
+                // ✅ Configuración estática, que es el patrón que tu librería espera
+                if (typeof mp.configure === 'function') {
+                    mp.configure({
+                        access_token: MP_ACCESS_TOKEN 
+                    });
+                    console.log("✅ SDK de Mercado Pago configurado exitosamente.");
+                } else {
+                    console.error("❌ ERROR: El objeto de Mercado Pago no tiene el método 'configure'. Revisar la versión de la librería.");
+                    throw new Error("Objeto MP inválido."); 
+                }
             }
-            // Si el token no existe, mpInstance será 'undefined', que es correcto.
-            return mpInstance; 
+            return mp; // Retornamos el objeto mp
         } catch (error) {
             console.error("Error al inicializar el SDK de Mercado Pago:", error);
             // Esto asegura que la promesa no se quede pendiente si falla
@@ -41,10 +42,10 @@ function setupMercadoPago() {
 // 2. Llamada a la función de configuración (se ejecuta al iniciar el servidor)
 setupMercadoPago();
 
-// Función de validación (ahora chequea mpInstance)
+// Función de validación (chequea mp)
 const checkSDK = (res) => {
-    if (!mpInstance) { // 🌟 Usamos mpInstance
-        // En un caso ideal, si llegamos aquí es que falló la inicialización
+    if (!mp) { // Usamos 'mp'
+        // Si llegamos aquí es que falló la inicialización (el catch de la promesa)
         res.status(503).json({ error: "El servicio de pagos aún no está disponible." });
         return false;
     }
@@ -63,7 +64,7 @@ export const createPreference = async (req, res) => {
         }
     }
     
-    if (!checkSDK(res)) return; // 🌟 Validación del SDK de respaldo
+    if (!checkSDK(res)) return; 
 
     const { items, customer, shipping_cost, order_id } = req.body; 
 
@@ -92,8 +93,8 @@ export const createPreference = async (req, res) => {
             external_reference: order_id || `temp-ref-${Date.now()}`
         };
 
-        // 🚨 CORRECCIÓN: Usamos mpInstance
-        const response = await mpInstance.preferences.create(preference);
+        // ✅ Usamos 'mp'
+        const response = await mp.preferences.create(preference);
         
         res.status(200).json({ preferenceId: response.body.id });
 
@@ -131,8 +132,8 @@ export const receiveWebhook = async (req, res) => {
 
         // Si el topic es 'payment', obtenemos la información del pago
         if (topic === 'payment') {
-            // 🚨 CORRECCIÓN: Usamos mpInstance
-            const response = await mpInstance.payment.get(resourceId);
+            // ✅ Usamos 'mp'
+            const response = await mp.payment.get(resourceId);
             paymentData = response.body;
 
         } else if (topic === 'merchant_order') {
