@@ -52,6 +52,7 @@ const checkSDK = (res) => {
     return true;
 };
 
+
 // --- CONTROLADOR EXISTENTE: CREAR PREFERENCIA (PARA CHECKOUT PRO) ---
 export const createPreference = async (req, res) => {
     // Esperar la inicialización
@@ -105,7 +106,6 @@ export const createPreference = async (req, res) => {
 
 // --- CONTROLADOR NUEVO: PROCESAR PAGO (PARA PAYMENT BRICK) ---
 export const processPayment = async (req, res) => {
-    // 🌟 Esperar inicialización
     if (initializationPromise) {
         try {
             await initializationPromise;
@@ -117,61 +117,57 @@ export const processPayment = async (req, res) => {
     if (!checkSDK(res)) return;
 
     try {
-        // Los datos vienen directamente del frontend (Payment Brick)
-        const { 
-            paymentMethodId, 
-            token, 
-            issuerId, 
-            transactionAmount, 
-            installments, 
-            payerEmail, 
-            orderId // Este campo debe ser enviado por tu frontend
-        } = req.body;
+        const paymentData = req.body;
 
-        const paymentBody = {
-            transaction_amount: transactionAmount,
-            token: token,
-            description: 'Compra de Clave Streetwear', // Usa una descripción estática o dinámica
-            installments: installments,
-            payment_method_id: paymentMethodId,
-            issuer_id: issuerId,
-            payer: {
-                email: payerEmail,
-            },
-            // Asegura que tienes la referencia para el Webhook
-            external_reference: orderId || `brick-ref-${Date.now()}`,
-            notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
-        };
-
-        // 🚨 Llamamos a paymentClient para crear el pago
-        const response = await paymentClient.create({ body: paymentBody });
-
-        // 🚀 Respuesta al frontend del Payment Brick
-        res.status(201).json({
-            id: response.id,
-            status: response.status,
-            detail: response.status_detail,
+        // Crear el pago con los datos del brick
+        const payment = await paymentClient.create({
+            body: {
+                transaction_amount: paymentData.transaction_amount,
+                token: paymentData.token, // Token de la tarjeta generado por el Brick
+                description: paymentData.description || 'Compra en Clave Streetwear',
+                installments: paymentData.installments,
+                payment_method_id: paymentData.payment_method_id,
+                issuer_id: paymentData.issuer_id,
+                payer: {
+                    email: paymentData.payer.email,
+                    identification: paymentData.payer.identification
+                },
+                // Datos adicionales opcionales
+                external_reference: paymentData.external_reference || `order-${Date.now()}`,
+                notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
+                metadata: {
+                    order_id: paymentData.order_id
+                }
+            }
         });
 
-    } catch (error) {
-        console.error("❌ Error al procesar pago con Payment Brick:", error);
+        console.log('💳 Pago procesado:', payment);
 
-        // Manejo de errores detallado
-        const status = error.status || 500;
-        const message = error.message || "Error interno al procesar el pago.";
-        
-        res.status(status).json({ 
-            error: message,
-            // Proporciona detalles específicos si Mercado Pago los devuelve
-            mp_error: error.cause && error.cause.length > 0 ? error.cause[0].description : 'Error desconocido de MP'
+        // Responder al frontend con el resultado
+        res.status(200).json({
+            status: payment.status,
+            status_detail: payment.status_detail,
+            id: payment.id,
+            external_reference: payment.external_reference
+        });
+
+        // Si el pago fue aprobado, actualizar la base de datos
+        if (payment.status === 'approved') {
+            console.log(`✅ Pago aprobado. ID: ${payment.id}`);
+            // [ACTUALIZAR BASE DE DATOS Y STOCK AQUÍ]
+        }
+
+    } catch (error) {
+        console.error("❌ Error al procesar el pago:", error);
+        res.status(500).json({ 
+            error: "Error al procesar el pago",
+            details: error.message 
         });
     }
 };
 
-
-// --- CONTROLADOR EXISTENTE: WEBHOOK ---
+// Webhook (mantenerlo para notificaciones asíncronas)
 export const receiveWebhook = async (req, res) => {
-    // Esperar la inicialización
     if (initializationPromise) {
         try {
             await initializationPromise;
@@ -182,7 +178,6 @@ export const receiveWebhook = async (req, res) => {
 
     if (!checkSDK(res)) return;
 
-    // Responder inmediatamente
     res.status(204).send();
 
     const topic = req.query.topic || req.query.type;
@@ -196,11 +191,9 @@ export const receiveWebhook = async (req, res) => {
         let paymentData;
 
         if (topic === 'payment') {
-            // ✅ Usar el cliente de pagos
             const response = await paymentClient.get({ id: resourceId });
             paymentData = response;
-
-        } else if (topic === 'merchant_order') {
+        } else {
             return;
         }
 
@@ -208,17 +201,11 @@ export const receiveWebhook = async (req, res) => {
             const status = paymentData.status;
             const externalReference = paymentData.external_reference;
 
-            console.log(`💳 Pago recibido. ID: ${paymentData.id}, Estado: ${status}, Ref: ${externalReference}`);
+            console.log(`💳 Webhook - Pago ${paymentData.id}, Estado: ${status}`);
 
             if (status === 'approved') {
-                console.log(`✅ Pago aprobado. Procediendo a actualizar DB y stock para el pedido: ${externalReference}`);
-                // [TUS FUNCIONES DE BASE DE DATOS AQUÍ]
-
-            } else if (status === 'rejected' || status === 'cancelled') {
-                console.log(`❌ Pago rechazado/cancelado para el pedido: ${externalReference}`);
-
-            } else if (status === 'in_process') {
-                console.log(`⚠️ Pago en proceso (pendiente) para el pedido: ${externalReference}`);
+                console.log(`✅ Pago aprobado vía webhook: ${externalReference}`);
+                // [ACTUALIZAR BASE DE DATOS SI NO SE HIZO ANTES]
             }
         }
     } catch (error) {
