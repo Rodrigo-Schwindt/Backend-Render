@@ -1,61 +1,68 @@
 // src/controllers/mercadopago.js
 
-let mp; 
-let initializationPromise; // 🌟 Almacena la promesa de inicialización
+let mpInstance; // 🌟 Usamos esta variable para la instancia configurada
+let initializationPromise; 
 
 // Función para inicializar el SDK de Mercado Pago de forma segura
 function setupMercadoPago() {
-    // 🌟 1. Creamos y almacenamos la promesa
-    initializationPromise = (async () => {
+    // 🌟 1. Creamos y almacenamos la promesa
+    initializationPromise = (async () => {
         try {
-            // Importación dinámica y obtención del módulo principal
+            // Importación dinámica del módulo
             const mercadopagoModule = await import('mercadopago');
-            mp = mercadopagoModule.default || mercadopagoModule; 
+            
+            // 🚨 CAMBIO CLAVE: Obtener el constructor/clase.
+            // La librería de MP exporta la clase principal para ser instanciada.
+            const MercadoPago = mercadopagoModule.default || mercadopagoModule;
             
             const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN; 
 
             if (!MP_ACCESS_TOKEN) {
                 console.error("❌ ERROR: MP_ACCESS_TOKEN no está definido.");
             } else {
-                mp.configure({
-                    access_token: MP_ACCESS_TOKEN 
-                });
+                // 🚨 CORRECCIÓN: Instanciamos la clase de Mercado Pago
+                // La configuración del token se pasa directamente al constructor.
+                mpInstance = new MercadoPago({
+                    access_token: MP_ACCESS_TOKEN 
+                });
+                
                 console.log("✅ SDK de Mercado Pago configurado exitosamente.");
             }
-            return mp; // Retornamos la instancia configurada
+            // Si el token no existe, mpInstance será 'undefined', que es correcto.
+            return mpInstance; 
         } catch (error) {
             console.error("Error al inicializar el SDK de Mercado Pago:", error);
-            // Esto asegura que la promesa no se quede pendiente si falla
-            throw new Error("Fallo en la inicialización del SDK de MP."); 
+            // Esto asegura que la promesa no se quede pendiente si falla
+            throw new Error("Fallo en la inicialización del SDK de MP."); 
         }
-    })(); // La ejecutamos inmediatamente
+    })(); // La ejecutamos inmediatamente
 }
 
 // 2. Llamada a la función de configuración (se ejecuta al iniciar el servidor)
 setupMercadoPago();
 
-// Función de validación (ahora es más simple)
+// Función de validación (ahora chequea mpInstance)
 const checkSDK = (res) => {
-    if (!mp) {
-        // En un caso ideal, si llegamos aquí es que falló la inicialización
-        res.status(503).json({ error: "El servicio de pagos aún no está disponible." });
-        return false;
-    }
-    return true;
+    if (!mpInstance) { // 🌟 Usamos mpInstance
+        // En un caso ideal, si llegamos aquí es que falló la inicialización
+        res.status(503).json({ error: "El servicio de pagos aún no está disponible." });
+        return false;
+    }
+    return true;
 };
 
 // 3. Controlador para crear la preferencia
 export const createPreference = async (req, res) => {
-    // 🌟 ESPERAMOS la inicialización antes de continuar
-    if (initializationPromise) {
-        try {
-            await initializationPromise;
-        } catch (e) {
-            // Si la promesa falló (ej. error de importación), enviamos 503
-            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
-        }
-    }
-    
+    // 🌟 ESPERAMOS la inicialización antes de continuar
+    if (initializationPromise) {
+        try {
+            await initializationPromise;
+        } catch (e) {
+            // Si la promesa falló (ej. error de importación), enviamos 503
+            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+        }
+    }
+    
     if (!checkSDK(res)) return; // 🌟 Validación del SDK de respaldo
 
     const { items, customer, shipping_cost, order_id } = req.body; 
@@ -85,8 +92,8 @@ export const createPreference = async (req, res) => {
             external_reference: order_id || `temp-ref-${Date.now()}`
         };
 
-        // Aquí 'mp' está garantizado a ser un objeto (configurado o no)
-        const response = await mp.preferences.create(preference);
+        // 🚨 CORRECCIÓN: Usamos mpInstance
+        const response = await mpInstance.preferences.create(preference);
         
         res.status(200).json({ preferenceId: response.body.id });
 
@@ -97,15 +104,15 @@ export const createPreference = async (req, res) => {
 };
 
 export const receiveWebhook = async (req, res) => {
-    // 🌟 ESPERAMOS la inicialización antes de continuar
-    if (initializationPromise) {
-        try {
-            await initializationPromise;
-        } catch (e) {
-            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
-        }
-    }
-    
+    // 🌟 ESPERAMOS la inicialización antes de continuar
+    if (initializationPromise) {
+        try {
+            await initializationPromise;
+        } catch (e) {
+            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+        }
+    }
+    
     if (!checkSDK(res)) return; // 🌟 Validación del SDK
 
     // ⚠️ Responder inmediatamente para confirmar recepción
@@ -124,8 +131,8 @@ export const receiveWebhook = async (req, res) => {
 
         // Si el topic es 'payment', obtenemos la información del pago
         if (topic === 'payment') {
-            // Usamos 'mp'
-            const response = await mp.payment.get(resourceId);
+            // 🚨 CORRECCIÓN: Usamos mpInstance
+            const response = await mpInstance.payment.get(resourceId);
             paymentData = response.body;
 
         } else if (topic === 'merchant_order') {
