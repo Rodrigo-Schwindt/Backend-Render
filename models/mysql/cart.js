@@ -1,9 +1,9 @@
 // src/services/cartService.js
 // Este archivo contiene la lógica de negocio segura para validar el carrito.
 
-import { Product } from "../schemes/mysql/product.js";
-import { Variant } from "../schemes/mysql/variant.js";
-import { Size } from "../schemes/mysql/size.js";
+import { Product } from "../../schemes/mysql/product.js";
+import { Variant } from "../../schemes/mysql/variant.js";
+import { Size } from "../../schemes/mysql/size.js";
 
 /**
  * Función centralizada para validar el carrito, verificar precios/stock y calcular el total.

@@ -10,6 +10,7 @@ import  routeForRopa  from "./routes/ropa.js";
 import { routeForUser } from "./routes/user.js";
 import productosRoutes from "./routes/filter.products.js";
 import mpRoutes from './routes/mercadopago.js';
+import cartRoutes from './routes/cart.js';
 
 //import { routeForAndreani, andreaniRoute } from "./routes/andreani.js";
 
@@ -42,6 +43,7 @@ export function createApp() {
   app.use("/user", routeForUser);
   app.use("/filter", productosRoutes);
   app.use('/api/payments', mpRoutes); 
+  app.use('/cart', cartRoutes); 
   //app.use("/andreani", routeForAndreani);
 
   // 404
