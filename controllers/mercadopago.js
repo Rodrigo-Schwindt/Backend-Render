@@ -1,6 +1,8 @@
 // src/controllers/mercadopago.js
 
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
+// 🚨 NUEVA IMPORTACIÓN: Función de validación del carrito
+import { validateCartItems } from '../models/mysql/cart.js'; 
 
 let client; // Cliente configurado de Mercado Pago
 let preferenceClient; // Cliente para manejar preferencias
@@ -9,35 +11,34 @@ let initializationPromise;
 
 // Función para inicializar el SDK de Mercado Pago
 function setupMercadoPago() {
-    initializationPromise = (async () => {
-        try {
-            const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
+    initializationPromise = (async () => {
+        try {
+            const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 
-            if (!MP_ACCESS_TOKEN) {
-                console.error("❌ ERROR: MP_ACCESS_TOKEN no está definido.");
-                throw new Error("MP_ACCESS_TOKEN no configurado");
-            }
+            if (!MP_ACCESS_TOKEN) {
+                console.error("❌ ERROR: MP_ACCESS_TOKEN no está definido.");
+                throw new Error("MP_ACCESS_TOKEN no configurado");
+            }
 
-            // ✅ Configuración moderna del SDK (v2.0+)
-            client = new MercadoPagoConfig({
-                accessToken: MP_ACCESS_TOKEN,
-                options: {
-                    timeout: 5000,
-                    // Eliminamos 'idempotencyKey' aquí ya que es mejor gestionarla por request si es necesario
-                }
-            });
+            // ✅ Configuración moderna del SDK (v2.0+)
+            client = new MercadoPagoConfig({
+                accessToken: MP_ACCESS_TOKEN,
+                options: {
+                    timeout: 5000,
+                }
+            });
 
-            // Inicializar los clientes específicos
-            preferenceClient = new Preference(client);
-            paymentClient = new Payment(client);
+            // Inicializar los clientes específicos
+            preferenceClient = new Preference(client);
+            paymentClient = new Payment(client);
 
-            console.log("✅ SDK de Mercado Pago configurado exitosamente.");
-            return true;
-        } catch (error) {
-            console.error("❌ Error al inicializar el SDK de Mercado Pago:", error);
-            throw new Error("Fallo en la inicialización del SDK de MP.");
-        }
-    })();
+            console.log("✅ SDK de Mercado Pago configurado exitosamente.");
+            return true;
+        } catch (error) {
+            console.error("❌ Error al inicializar el SDK de Mercado Pago:", error);
+            throw new Error("Fallo en la inicialización del SDK de MP.");
+        }
+    })();
 }
 
 // Llamada a la función de configuración
@@ -45,170 +46,200 @@ setupMercadoPago();
 
 // Función de validación
 const checkSDK = (res) => {
-    if (!client || !preferenceClient || !paymentClient) {
-        res.status(503).json({ error: "El servicio de pagos aún no está disponible." });
-        return false;
-    }
-    return true;
+    if (!client || !preferenceClient || !paymentClient) {
+        res.status(503).json({ error: "El servicio de pagos aún no está disponible." });
+        return false;
+    }
+    return true;
 };
 
 
 // --- CONTROLADOR EXISTENTE: CREAR PREFERENCIA (PARA CHECKOUT PRO) ---
 export const createPreference = async (req, res) => {
-    // Esperar la inicialización
-    if (initializationPromise) {
-        try {
-            await initializationPromise;
-        } catch (e) {
-            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
-        }
-    }
+    // Esperar la inicialización
+    if (initializationPromise) {
+        try {
+            await initializationPromise;
+        } catch (e) {
+            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+        }
+    }
 
-    if (!checkSDK(res)) return;
+    if (!checkSDK(res)) return;
 
-    const { items, customer, shipping_cost, order_id } = req.body;
+    // 🚨 CAMBIO: Ahora esperamos que el frontend envíe los ítems de carrito
+    // con solo IDs y cantidades para validar.
+    const { items: cartItems, customer, shipping_cost, order_id } = req.body; 
 
-    // Mapear los ítems del carrito
-    const mp_items = items.map(item => ({
-        title: item.title,
-        unit_price: Number(item.price),
-        quantity: Number(item.quantity),
-        currency_id: "ARS"
-    }));
-
+    // 🚨 PASO DE SEGURIDAD: VALIDAR y OBTENER PRECIOS REALES antes de crear la preferencia
     try {
+        const validationResult = await validateCartItems(cartItems);
+
+        if (!validationResult.isValid) {
+            console.error("❌ Intento de crear preferencia con carrito inválido:", validationResult.errors);
+            return res.status(400).json({ 
+                error: "El carrito es inválido. Por favor, revisa tus productos.",
+                details: validationResult.errors 
+            });
+        }
+        
+        // Mapear los ítems VALIDADOS para Mercado Pago
+        const mp_items = validationResult.items.map(item => ({
+            title: item.title,
+            unit_price: Number(item.price),
+            quantity: Number(item.quantity),
+            currency_id: "ARS"
+        }));
+
         const preferenceBody = { // Renombrado a 'preferenceBody' para mayor claridad
-            items: mp_items,
-            payer: {
-                email: customer.email,
-                name: customer.name
-            },
-            back_urls: {
-                success: "https://clancestreetwear.in/checkout/success",
-                failure: "https://clancestreetwear.in/checkout/failure",
-                pending: "https://clancestreetwear.in/checkout/pending"
-            },
-            notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
-            auto_return: "approved",
-            external_reference: order_id || `temp-ref-${Date.now()}`
-        };
+            items: mp_items, // ✅ Usamos los ítems con precios de la DB
+            payer: {
+                email: customer.email,
+                name: customer.name
+            },
+            back_urls: {
+                success: "https://clancestreetwear.in/checkout/success",
+                failure: "https://clancestreetwear.in/checkout/failure",
+                pending: "https://clancestreetwear.in/checkout/pending"
+            },
+            notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
+            auto_return: "approved",
+            external_reference: order_id || `temp-ref-${Date.now()}`
+        };
 
-        // ✅ Usar el cliente de preferencias
-        const response = await preferenceClient.create({ body: preferenceBody });
+        // ✅ Usar el cliente de preferencias
+        const response = await preferenceClient.create({ body: preferenceBody });
 
-        res.status(200).json({ preferenceId: response.id });
+        res.status(200).json({ preferenceId: response.id });
 
-    } catch (error) {
-        console.error("❌ Error al crear la preferencia de MP:", error);
-        res.status(500).json({ error: "No se pudo crear la preferencia de pago." });
-    }
+    } catch (error) {
+        console.error("❌ Error al crear la preferencia de MP:", error);
+        res.status(500).json({ error: "No se pudo crear la preferencia de pago." });
+    }
 };
 
 // --- CONTROLADOR NUEVO: PROCESAR PAGO (PARA PAYMENT BRICK) ---
 export const processPayment = async (req, res) => {
-    if (initializationPromise) {
-        try {
-            await initializationPromise;
-        } catch (e) {
-            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+    if (initializationPromise) {
+        try {
+            await initializationPromise;
+        } catch (e) {
+            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+        }
+    }
+
+    if (!checkSDK(res)) return;
+
+    try {
+        // 🚨 CAMBIO: Extraemos 'items' para la re-validación.
+        const { items: cartItems, ...paymentData } = req.body;
+
+        // 🚨 PASO CRÍTICO DE SEGURIDAD: RE-VALIDAR Y OBTENER EL MONTO FINAL SEGURO
+        const validationResult = await validateCartItems(cartItems);
+        
+        if (!validationResult.isValid) {
+            console.error("❌ Intento de pago con carrito inválido:", validationResult.errors);
+            return res.status(400).json({ 
+                error: "El carrito es inválido. Por favor, revisa tus productos antes de pagar.",
+                details: validationResult.errors 
+            });
         }
-    }
+        
+        // 🔑 Usamos el monto TOTAL CALCULADO y VALIDADO por el backend
+        const transactionAmount = validationResult.totalPrice; 
 
-    if (!checkSDK(res)) return;
+        // Crear el pago con los datos del brick
+        const payment = await paymentClient.create({
+            body: {
+                transaction_amount: transactionAmount, // ✅ MONTO SEGURO
+                token: paymentData.token, // Token de la tarjeta generado por el Brick
+                description: paymentData.description || 'Compra en Clave Streetwear',
+                installments: paymentData.installments,
+                payment_method_id: paymentData.payment_method_id,
+                issuer_id: paymentData.issuer_id,
+                payer: {
+                    email: paymentData.payer.email,
+                    identification: paymentData.payer.identification
+                },
+                // Datos adicionales opcionales
+                external_reference: paymentData.external_reference || `order-${Date.now()}`,
+                notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
+                metadata: {
+                    order_id: paymentData.order_id
+                }
+            }
+        });
 
-    try {
-        const paymentData = req.body;
+        console.log('💳 Pago procesado:', payment);
 
-        // Crear el pago con los datos del brick
-        const payment = await paymentClient.create({
-            body: {
-                transaction_amount: paymentData.transaction_amount,
-                token: paymentData.token, // Token de la tarjeta generado por el Brick
-                description: paymentData.description || 'Compra en Clave Streetwear',
-                installments: paymentData.installments,
-                payment_method_id: paymentData.payment_method_id,
-                issuer_id: paymentData.issuer_id,
-                payer: {
-                    email: paymentData.payer.email,
-                    identification: paymentData.payer.identification
-                },
-                // Datos adicionales opcionales
-                external_reference: paymentData.external_reference || `order-${Date.now()}`,
-                notification_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
-                metadata: {
-                    order_id: paymentData.order_id
-                }
-            }
-        });
+        // Responder al frontend con el resultado
+        res.status(200).json({
+            status: payment.status,
+            status_detail: payment.status_detail,
+            id: payment.id,
+            external_reference: payment.external_reference
+        });
 
-        console.log('💳 Pago procesado:', payment);
+        // Si el pago fue aprobado, actualizar la base de datos
+        if (payment.status === 'approved') {
+            console.log(`✅ Pago aprobado. ID: ${payment.id}`);
+            // [ACTUALIZAR BASE DE DATOS Y STOCK AQUÍ]
+            // Aquí puedes llamar a una función para DECREMENTAR STOCK de forma segura.
+        }
 
-        // Responder al frontend con el resultado
-        res.status(200).json({
-            status: payment.status,
-            status_detail: payment.status_detail,
-            id: payment.id,
-            external_reference: payment.external_reference
-        });
-
-        // Si el pago fue aprobado, actualizar la base de datos
-        if (payment.status === 'approved') {
-            console.log(`✅ Pago aprobado. ID: ${payment.id}`);
-            // [ACTUALIZAR BASE DE DATOS Y STOCK AQUÍ]
-        }
-
-    } catch (error) {
-        console.error("❌ Error al procesar el pago:", error);
-        res.status(500).json({ 
-            error: "Error al procesar el pago",
-            details: error.message 
-        });
-    }
+    } catch (error) {
+        console.error("❌ Error al procesar el pago:", error);
+        res.status(500).json({ 
+            error: "Error al procesar el pago",
+            details: error.message 
+        });
+    }
 };
 
 // Webhook (mantenerlo para notificaciones asíncronas)
 export const receiveWebhook = async (req, res) => {
-    if (initializationPromise) {
-        try {
-            await initializationPromise;
-        } catch (e) {
-            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
-        }
-    }
+    if (initializationPromise) {
+        try {
+            await initializationPromise;
+        } catch (e) {
+            return res.status(503).json({ error: "El servicio de pagos falló al iniciar." });
+        }
+    }
 
-    if (!checkSDK(res)) return;
+    if (!checkSDK(res)) return;
 
-    res.status(204).send();
+    res.status(204).send();
 
-    const topic = req.query.topic || req.query.type;
-    const resourceId = req.query.id || req.query['data.id'];
+    const topic = req.query.topic || req.query.type;
+    const resourceId = req.query.id || req.query['data.id'];
 
-    if (!topic || !resourceId) {
-        return;
-    }
+    if (!topic || !resourceId) {
+        return;
+    }
 
-    try {
-        let paymentData;
+    try {
+        let paymentData;
 
-        if (topic === 'payment') {
-            const response = await paymentClient.get({ id: resourceId });
-            paymentData = response;
-        } else {
-            return;
-        }
+        if (topic === 'payment') {
+            const response = await paymentClient.get({ id: resourceId });
+            paymentData = response;
+        } else {
+            return;
+        }
 
-        if (paymentData) {
-            const status = paymentData.status;
-            const externalReference = paymentData.external_reference;
+        if (paymentData) {
+            const status = paymentData.status;
+            const externalReference = paymentData.external_reference;
 
-            console.log(`💳 Webhook - Pago ${paymentData.id}, Estado: ${status}`);
+            console.log(`💳 Webhook - Pago ${paymentData.id}, Estado: ${status}`);
 
-            if (status === 'approved') {
-                console.log(`✅ Pago aprobado vía webhook: ${externalReference}`);
-                // [ACTUALIZAR BASE DE DATOS SI NO SE HIZO ANTES]
-            }
-        }
-    } catch (error) {
-        console.error("❌ Error al procesar webhook de MP:", error);
-    }
+            if (status === 'approved') {
+                console.log(`✅ Pago aprobado vía webhook: ${externalReference}`);
+                // [ACTUALIZAR BASE DE DATOS SI NO SE HIZO ANTES]
+                // Aquí deberías realizar la disminución de stock y la creación de la orden final
+            }
+        }
+    } catch (error) {
+        console.error("❌ Error al procesar webhook de MP:", error);
+    }
 };
