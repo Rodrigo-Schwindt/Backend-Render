@@ -16,6 +16,10 @@ const main = async () => {
     const app = createApp();
 
     const PORT = process.env.PORT || 3010;
+    app.post('/cart/validate', (_req, res) => {
+        console.log("¡Ruta de validación ALCANZADA!");
+        res.status(200).json({ success: true, message: "Ruta OK" });
+    });
     const server = app.listen(PORT, () => {
       console.log(`Servidor en http://localhost:${server.address().port}`);
     });

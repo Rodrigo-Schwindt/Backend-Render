@@ -32,7 +32,10 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 export function createApp() {
   app.get("/", (_req, res) => res.send("hola mundo"));
-
+  app.post('/cart/validate', (_req, res) => {
+    console.log("¡Ruta de validación ALCANZADA!");
+    res.status(200).json({ success: true, message: "Ruta OK" });
+});
   // Inicializa controladores/handlers sobre los routers
 
 
