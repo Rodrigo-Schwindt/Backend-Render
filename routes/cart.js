@@ -6,7 +6,7 @@ import { validateCart } from '../controllers/cart.js';
 
 const cartRoutes = express.Router();
 
-cartRoutes.post('/cart/validate', validateCart); 
+cartRoutes.post('/validate', validateCart); 
 
 // Si usas un endpoint para crear órdenes/checkout
 // router.post('/checkout', createOrder);
