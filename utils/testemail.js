@@ -1,13 +1,12 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
-dotenv.config(); // Busca .env en la raíz
+dotenv.config(); 
 
 const MAIL_USER = process.env.MAIL_USER;
 const MAIL_PASS = process.env.MAIL_PASS;
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = Number(process.env.SMTP_PORT);
 
-// Log para verificar las variables
 console.log({ MAIL_USER, MAIL_PASS, SMTP_HOST, SMTP_PORT });
 
 const transporter = nodemailer.createTransport({
@@ -23,7 +22,7 @@ const transporter = nodemailer.createTransport({
 export async function sendMail({ to, subject, html, text }) {
   try {
     await transporter.verify();
-    console.log("Transporter verified OK");
+    console.log("Transporter verified OK!");
     return transporter.sendMail({
       from: `"Calzados" <${MAIL_USER}>`,
       to,
