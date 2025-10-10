@@ -32,10 +32,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 export function createApp() {
   app.get("/", (_req, res) => res.send("hola mundo"));
-  // Inicializa controladores/handlers sobre los routers
 
-
-  // Enruta los routers
   app.use('/cart', cartRoutes); 
   app.use("/calzados", routeForCalzados);
   app.use("/ropa", routeForRopa);
@@ -45,12 +42,9 @@ export function createApp() {
   app.use('/api/payments', mpRoutes); 
   //app.use("/andreani", routeForAndreani);
 
-  // 404
   app.use((_req, res) => {
     res.status(404).json({ message: "404 Not Found" });
   });
 
-  return app; // IMPORTANTE: devolver app
+  return app; 
 }
-
-// Nota: no hagas app.listen aquí. El server se levanta en el startpoint.

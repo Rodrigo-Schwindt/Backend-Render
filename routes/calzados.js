@@ -3,50 +3,43 @@ import { calzadosController } from "../controllers/mysql/calzados.js";
 
 import { 
   uploadProductWithVariants, 
-  // Eliminamos processProductImages
   uploadSingle, 
-  // Eliminamos processImage
   uploadMultiple, 
-  // Eliminamos processImages
-  extractCloudinaryUrls, // <--- CAMBIO CLAVE: Importamos el nuevo extractor
+  extractCloudinaryUrls, 
 } from "../middleware/upload.js";
 
 const routeForCalzados = Router();
 
-// Rutas básicas de productos
 routeForCalzados.get("/", calzadosController.getAll);
 routeForCalzados.get("/filter", calzadosController.getForFilter);
 routeForCalzados.get("/types-brands", calzadosController.getTypesBrands);
 routeForCalzados.get("/:id", calzadosController.getById);
 
-// Crear producto (con variantes e imágenes múltiples)
 routeForCalzados.post('/', 
   uploadProductWithVariants, 
-  extractCloudinaryUrls, // <--- Usamos el nuevo middleware
+  extractCloudinaryUrls, 
   calzadosController.create
 );
 
-// Actualizar producto (PATCH unificado)
+
 routeForCalzados.patch("/:id", 
   uploadSingle, 
-  extractCloudinaryUrls, // <--- Usamos el nuevo middleware
+  extractCloudinaryUrls, 
   calzadosController.update
 );
 
-// Reemplazar un producto (PUT)
 routeForCalzados.put("/:id", 
   uploadSingle, 
-  extractCloudinaryUrls, // <--- Usamos el nuevo middleware
+  extractCloudinaryUrls,
   calzadosController.replace
 );
 
 routeForCalzados.delete("/:id", calzadosController.delete);
 
-// Rutas de variantes
 routeForCalzados.post("/:id/variants", calzadosController.addVariant);
 routeForCalzados.post("/:id/variants/:color/images", 
   uploadMultiple, 
-  extractCloudinaryUrls, // <--- Usamos el nuevo middleware
+  extractCloudinaryUrls,
   calzadosController.addVariantImages
 );
 routeForCalzados.post("/:id/variants/increment", calzadosController.incrementStock);

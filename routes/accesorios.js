@@ -3,10 +3,10 @@ import { accesoriosController } from "../controllers/mysql/accesorios.js";
 
 import { 
   uploadProductWithVariants, 
-  extractCloudinaryUrls,  // <--- Importamos el nuevo middleware
+  extractCloudinaryUrls,  
   uploadSingle, 
   uploadMultiple, 
-} from "../middleware/upload.js"; // Asegúrate de que este path sea correcto
+} from "../middleware/upload.js"; 
 
 const routeForAccesorios = Router();
 
@@ -16,37 +16,31 @@ routeForAccesorios.get("/filter", accesoriosController.getForFilter);
 routeForAccesorios.get("/types-brands", accesoriosController.getTypesBrands);
 routeForAccesorios.get("/:id", accesoriosController.getById);
 
-// Crear producto
-// Ahora usamos uploadProductWithVariants para subir y luego extractCloudinaryUrls para obtener las URLs
+
 routeForAccesorios.post('/', 
   uploadProductWithVariants, 
-  extractCloudinaryUrls, // <--- CAMBIO CLAVE: Reemplaza processProductImages
+  extractCloudinaryUrls, 
   accesoriosController.create
 );
 
-// Actualizar un producto (PATCH)
-// Esta ruta es para actualizar cualquier campo del producto, incluida la portada
 routeForAccesorios.patch("/:id", 
   uploadSingle, 
-  extractCloudinaryUrls, // <--- CAMBIO CLAVE: Reemplaza processImage
+  extractCloudinaryUrls, 
   accesoriosController.update
 );
 
-// Reemplazar un producto (PUT)
 routeForAccesorios.put("/:id", 
   uploadSingle, 
-  extractCloudinaryUrls, // <--- CAMBIO CLAVE: Reemplaza processImage
+  extractCloudinaryUrls, 
   accesoriosController.replace
 );
 
-// Borrar un producto
 routeForAccesorios.delete("/:id", accesoriosController.delete);
 
-// Rutas de variantes
 routeForAccesorios.post("/:id/variants", accesoriosController.addVariant);
 routeForAccesorios.post("/:id/variants/:color/images", 
   uploadMultiple, 
-  extractCloudinaryUrls, // <--- CAMBIO CLAVE: Reemplaza processImages
+  extractCloudinaryUrls, 
   accesoriosController.addVariantImages
 );
 routeForAccesorios.post("/:id/variants/increment", accesoriosController.incrementStock);

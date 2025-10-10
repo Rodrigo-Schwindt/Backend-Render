@@ -13,16 +13,13 @@ function slugify(str = "") {
 function toArray(val) {
   if (val == null) return [];
 
-  // Si ya es array → lo devuelvo
   if (Array.isArray(val)) return val;
 
-  // Si viene como string JSON de array → intento parsear
   if (typeof val === "string") {
     try {
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed)) return parsed;
     } catch {
-      // si no es JSON, lo parto por coma
       return val.split(",").map(v => v.trim());
     }
   }
@@ -33,22 +30,18 @@ function toArray(val) {
 export class Productos {
 
   static async GetProductosForFilter(filter = {}) {
-    // Construyo where dinámico + condiciones JSON usando JSON_CONTAINS (MySQL)
     const where = {};
     const andConditions = [];
 
-    // category (si viene)
     if (filter.category) {
       where.category = { [Op.in]: toArray(filter.category).map(c => String(c).toLowerCase()) };
     }
 
-    // brand
     if (filter.brand) {
       const brandSlugs = toArray(filter.brand).map(slugify);
       andConditions.push({ brandSlug: { [Op.in]: brandSlugs } });
     }
 
-    // types / tipo -> usar JSON_CONTAINS sobre typeSlugs
     const rawTypes = [...toArray(filter.types), ...toArray(filter.tipo)];
     if (rawTypes.length) {
       rawTypes.forEach(t => {
@@ -62,10 +55,9 @@ export class Productos {
       });
     }
 
-    // genero -> JSON_CONTAINS sobre genero
     if (filter.genero) {
       toArray(filter.genero).forEach(g => {
-        const val = String(g); // normaliza
+        const val = String(g);
         andConditions.push(
           sequelizeWhere(
             fn("JSON_CONTAINS", col("Product.genero"), JSON.stringify(val)),
@@ -75,16 +67,13 @@ export class Productos {
       });
     }
 
-    // si hay condiciones acumuladas las meto en where
     if (andConditions.length) where[Op.and] = andConditions;
 
-    // filtros sobre variantes (colores)
     const variantsWhere = {};
     if (filter.color) {
       variantsWhere.colorSlug = { [Op.in]: toArray(filter.color).map(slugify) };
     }
 
-    // Traigo productos + variants + sizes (sin where en sizes)
     const productos = await Product.findAll({
       where,
       include: [{
@@ -95,13 +84,12 @@ export class Productos {
         include: [{
           model: Size,
           as: "sizes",
-          required: false // traigo talles para filtrar en memoria
+          required: false
         }]
       }],
       order: [["createdAt", "DESC"]]
     });
 
-    // Filtrado en memoria por talles (size)
     let resultado = productos;
     if (filter.size) {
       const sizesFiltro = toArray(filter.size).map(s => String(s).toLowerCase());

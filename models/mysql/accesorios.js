@@ -2,7 +2,7 @@ import { Product } from "../../schemes/mysql/product.js";
 import { Variant } from "../../schemes/mysql/variant.js";
 import { Size } from "../../schemes/mysql/size.js";
 import { Op, fn, col, where as sequelizeWhere } from "sequelize";
-import { v2 as cloudinary } from 'cloudinary'; // <-- 1. IMPORTANTE: Importamos Cloudinary
+import { v2 as cloudinary } from 'cloudinary'; 
 
 function slugify(str = "") {
   return String(str).trim().toLowerCase()
@@ -15,7 +15,7 @@ function toArray(val) {
   return Array.isArray(val) ? val : [val];
 }
 
-// Función para normalizar valores a arrays
+
 function normalizeToArray(val) {
   if (val == null || val === undefined) return [];
   if (Array.isArray(val)) return val;
@@ -26,18 +26,15 @@ function buildQueryFromFilter(filter = {}) {
   const where = {};
   const andConditions = [];
 
-  // 🔍 Filtro por título (LIKE)
   if (filter.title) {
     where.title = { [Op.like]: `%${filter.title}%` };
   }
 
-  // 🔍 Filtro por marca
   if (filter.brand) {
     const brandSlugs = toArray(filter.brand).map(slugify);
     andConditions.push({ brandSlug: { [Op.in]: brandSlugs } });
   }
 
-  // 🔍 Filtro por types (JSON_CONTAINS en typeSlugs)
   const rawTypes = [...toArray(filter.types), ...toArray(filter.tipo)];
   if (rawTypes.length) {
     rawTypes.forEach(type => {
@@ -50,7 +47,6 @@ function buildQueryFromFilter(filter = {}) {
     });
   }
 
-  // 🔍 Filtro por género (JSON_CONTAINS en genero)
   if (filter.genero) {
     const generos = toArray(filter.genero).map(slugify);
     generos.forEach(g => {
@@ -63,7 +59,6 @@ function buildQueryFromFilter(filter = {}) {
     });
   }
 
-  // 🔍 Agregar condiciones acumuladas al WHERE
   if (andConditions.length) {
     where[Op.and] = andConditions;
   }
@@ -71,23 +66,18 @@ function buildQueryFromFilter(filter = {}) {
   return where;
 }
 
-// 2. FUNCIÓN AUXILIAR DE CLOUDINARY
 async function deleteCloudinaryImages(urls = []) {
     if (!urls || urls.length === 0) return;
 
-    // 1. Extraer los Public IDs de las URLs (ej: 'clavestreetwear/productos/imagen-12345')
     const publicIds = urls.map(url => {
         if (!url || !url.includes('clavestreetwear/productos')) return null; 
         
         const parts = url.split('/upload/')[1];
         if (!parts) return null;
         
-        // Maneja posibles transformaciones y extrae la ruta del archivo
-        // Busca la parte de la URL que contiene la carpeta 'clavestreetwear'
         const index = parts.indexOf('clavestreetwear');
         if (index === -1) return null;
 
-        // Extrae el Public ID completo (sin la extensión)
         const publicIdWithExtension = parts.substring(index);
         const publicId = publicIdWithExtension.split('.').slice(0, -1).join('.');
 
@@ -96,17 +86,12 @@ async function deleteCloudinaryImages(urls = []) {
 
     if (publicIds.length === 0) return;
 
-    // 2. Eliminar de Cloudinary
     try {
         await cloudinary.api.delete_resources(publicIds);
     } catch (error) {
         console.error("❌ Error al eliminar imágenes de Cloudinary:", error);
-        // Continuar para no detener la eliminación de la DB
     }
 }
-/**
- * Lógica de negocio para accesorios (MySQL/Sequelize)
- */
 export class Accesorios {
   // Traer todos los accesorios
   static async GetAccesorios() {
@@ -121,7 +106,6 @@ export class Accesorios {
     });
   }
 
-  // Traer por filtro
   static async GetAccesoriosForFilter(filter) {
     const where = buildQueryFromFilter(filter);
     const variantsWhere = {};
@@ -129,13 +113,13 @@ export class Accesorios {
     const sizesWhere = {};
     if (filter.size) {
       sizesWhere.size = {
-        [Op.in]: toArray(filter.size).map(String) // normaliza todo a string
+        [Op.in]: toArray(filter.size).map(String) 
       };
     }
     return Product.findAll({
       where: {
-        category: "accesorios", // Fija la categoría
-        ...where, // Añade los filtros dinámicos
+        category: "accesorios", 
+        ...where, 
       },
       include: [{
         model: Variant,
@@ -153,7 +137,6 @@ export class Accesorios {
     });
   }
 
-  // Traer uno por ID
   static async GetAccesoriosForID(id) {
     return Product.findByPk(id, {
       include: [{
@@ -164,7 +147,6 @@ export class Accesorios {
     });
   }
 
-  // Tipos y marcas
   static async getAllTypesAndBrands() {
   const productos = await Product.findAll({
     where: { category: "accesorios" },
@@ -176,12 +158,11 @@ export class Accesorios {
     order: [["createdAt", "DESC"]]
   });
 
-  // 💥 Aquí es donde procesas los datos para asegurarte de que las imágenes son arrays
+
   return productos.map(p => {
     const productData = p.toJSON();
     if (Array.isArray(productData.variants)) {
       productData.variants = productData.variants.map(v => {
-        // Convierte la cadena JSON en un array de JavaScript
         if (typeof v.images === 'string') {
           try {
             v.images = JSON.parse(v.images);
@@ -197,23 +178,20 @@ export class Accesorios {
   });
   }
 
-  // Crear accesorio (con variantes y talles)
+
 static async CreateAccesorios(data) {
-  // Normalizamos los campos que deben ser arrays
   const types = normalizeToArray(data.types);
   const typeSlugs = types.map(type => slugify(type));
   const genero = normalizeToArray(data.genero);
 
   const { variants, ...base } = data;
 
-  // Crear el producto con los arrays normalizados
   const product = await Product.create({
     ...base,
     category: "accesorios",
     types,
     typeSlugs,
     genero,
-    // Si hay brand, también generar brandSlug
     ...(data.brand && { brandSlug: slugify(data.brand) })
   });
 
@@ -221,12 +199,12 @@ static async CreateAccesorios(data) {
     for (const variant of variants) {
       const { sizes, ...restVariant } = variant;
 
-      // 🔹 CAMBIO CLAVE: Normalizamos imágenes, asumiendo que ya son un array de URLs de Cloudinary
+   
       let images = Array.isArray(restVariant.images) ? restVariant.images : [];
 
       const nuevaVariante = await Variant.create({
         ...restVariant,
-        images, // Ya es un array de URLs de string
+        images,
         colorSlug: slugify(variant.color),
         productId: product.id
       });
@@ -246,7 +224,6 @@ static async CreateAccesorios(data) {
     const accesorio = await Product.findByPk(id);
     if (!accesorio) return null;
 
-    // Normalizar arrays si están presentes
     const normalizedData = { ...data };
     if (data.types) {
       normalizedData.types = normalizeToArray(data.types);
@@ -267,7 +244,6 @@ static async CreateAccesorios(data) {
     const accesorio = await Product.findByPk(id);
     if (!accesorio) return null;
 
-    // Normalizar arrays para replace también
     const normalizedData = { ...data };
     if (data.types) {
       normalizedData.types = normalizeToArray(data.types);
@@ -284,10 +260,8 @@ static async CreateAccesorios(data) {
     return this.GetAccesoriosForID(id);
   }
 
-  // 3. DELETE ACCESORIOS (Elimina producto y TODAS las imágenes asociadas)
   static async DeleteAccesorios(id) {
     const accesorio = await Product.findByPk(id, {
-        // Incluimos las variantes para poder obtener las URLs de las imágenes
         include: [{ 
             model: Variant, 
             as: "variants" 
@@ -295,7 +269,6 @@ static async CreateAccesorios(data) {
     });
     if (!accesorio) return null;
 
-    // 1. RECOLECTAR TODAS LAS URLS DE IMAGENES (Portada + Variantes)
     const allUrls = [];
     
     if (accesorio.coverImage) {
@@ -309,16 +282,13 @@ static async CreateAccesorios(data) {
         });
     }
 
-    // 2. LLAMAR A LA FUNCION DE BORRADO DE CLOUDINARY
     await deleteCloudinaryImages(allUrls);
 
-    // 3. ELIMINAR DE LA BASE DE DATOS (MySQL)
     await Variant.destroy({ where: { productId: id } });
     await accesorio.destroy();
     return true;
   }
 
-  // Agregar variante a un producto
   static async AddVariantToProduct(productId, { color, colorCode, images = [], sizes = [] }) {
     const product = await Product.findByPk(productId, {
       include: [{ model: Variant, as: "variants" }]
@@ -344,7 +314,6 @@ static async CreateAccesorios(data) {
     return this.GetAccesoriosForID(productId);
   }
 
-  // Agregar imágenes a una variante
   static async AddImagesToVariant(productId, color, imagesArr) {
     const cSlug = slugify(decodeURIComponent(color));
     const variant = await Variant.findOne({ where: { productId, colorSlug: cSlug } });
@@ -354,16 +323,13 @@ static async CreateAccesorios(data) {
     return this.GetAccesoriosForID(productId);
   }
 
-  // 4. RemoveImageFromVariant (Elimina UNA SOLA imagen de la DB y de Cloudinary)
   static async RemoveImageFromVariant(productId, color, image) {
     const cSlug = slugify(decodeURIComponent(color));
     const variant = await Variant.findOne({ where: { productId, colorSlug: cSlug } });
     if (!variant) return null;
     
-    // 1. Elimina el archivo físico de Cloudinary
-    await deleteCloudinaryImages([image]); // Le pasamos la URL a borrar
+    await deleteCloudinaryImages([image]); 
     
-    // 2. Elimina la URL de la base de datos
     const imgs = (variant.images || []).filter(img => img !== image);
     await variant.update({ images: imgs });
     
@@ -371,13 +337,11 @@ static async CreateAccesorios(data) {
   }
   
 
-  // Actualizar variante
   static async UpdateVariant(productId, color, data) {
     const cSlug = slugify(color);
     const variant = await Variant.findOne({ where: { productId, colorSlug: cSlug } });
     if (!variant) return null;
     if (data.color && slugify(data.color) !== variant.colorSlug) {
-      // Verificar que no exista
       const exists = await Variant.findOne({ where: { productId, colorSlug: slugify(data.color) } });
       if (exists) throw new Error("Ya existe otra variante con ese color");
     }
@@ -385,7 +349,6 @@ static async CreateAccesorios(data) {
       ...data,
       colorSlug: data.color ? slugify(data.color) : variant.colorSlug
     });
-    // Actualizar talles si vienen
     if (data.sizes) {
       await Size.destroy({ where: { variantId: variant.id } });
       for (const sz of data.sizes) {
@@ -395,25 +358,20 @@ static async CreateAccesorios(data) {
     return this.GetAccesoriosForID(productId);
   }
 
-  // 5. DeleteVariant (Elimina la variante, sus talles y TODAS sus imágenes de la nube)
   static async DeleteVariant(productId, color) {
     const cSlug = slugify(color);
     const variant = await Variant.findOne({ where: { productId, colorSlug: cSlug } });
     if (!variant) return null;
 
-    // 1. RECOLECTAR URLS DE ESTA VARIANTE
     const variantUrls = Array.isArray(variant.images) ? variant.images : [];
 
-    // 2. ELIMINAR IMAGENES DE CLOUDINARY
     await deleteCloudinaryImages(variantUrls);
     
-    // 3. ELIMINAR DE LA BASE DE DATOS (MySQL)
     await Size.destroy({ where: { variantId: variant.id } });
     await variant.destroy();
     return this.GetAccesoriosForID(productId);
   }
 
-  // Decrementar stock
   static async DecrementStock(productId, color, size, qty) {
     const cSlug = slugify(color);
     const variant = await Variant.findOne({ where: { productId, colorSlug: cSlug } });
@@ -425,7 +383,6 @@ static async CreateAccesorios(data) {
     return this.GetAccesoriosForID(productId);
   }
 
-  // Incrementar stock
   static async IncrementStock(productId, color, size, qty) {
     const cSlug = slugify(color);
     const variant = await Variant.findOne({ where: { productId, colorSlug: cSlug } });

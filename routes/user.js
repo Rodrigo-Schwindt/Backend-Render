@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { UserController } from "../controllers/mysql/user.js";
-import { User } from "../models/mysql/user.js"; // O tu modelo Sequelize
+import { User } from "../models/mysql/user.js"; 
 
 export const routeForUser = Router();
 const userController = new UserController(User);

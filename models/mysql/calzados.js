@@ -2,7 +2,7 @@ import { Product } from "../../schemes/mysql/product.js";
 import { Variant } from "../../schemes/mysql/variant.js";
 import { Size } from "../../schemes/mysql/size.js";
 import { Op, fn, col, where as sequelizeWhere } from "sequelize";
-import { v2 as cloudinary } from 'cloudinary'; // <-- IMPORTANTE: Agregar import de Cloudinary
+import { v2 as cloudinary } from 'cloudinary'; 
 
 function slugify(str = "") {
   return String(str).trim().toLowerCase()
@@ -15,7 +15,6 @@ function toArray(val) {
   return Array.isArray(val) ? val : [val];
 }
 
-// Función para normalizar valores a arrays
 function normalizeToArray(val) {
   if (val == null || val === undefined) return [];
   if (Array.isArray(val)) return val;
@@ -26,18 +25,15 @@ function buildQueryFromFilter(filter = {}) {
   const where = {};
   const andConditions = [];
 
-  // 🔍 Filtro por título (LIKE)
   if (filter.title) {
     where.title = { [Op.like]: `%${filter.title}%` };
   }
 
-  // 🔍 Filtro por marca
   if (filter.brand) {
     const brandSlugs = toArray(filter.brand).map(slugify);
     andConditions.push({ brandSlug: { [Op.in]: brandSlugs } });
   }
 
-  // 🔍 Filtro por types (JSON_CONTAINS en typeSlugs)
   const rawTypes = [...toArray(filter.types), ...toArray(filter.tipo)];
   if (rawTypes.length) {
     rawTypes.forEach(type => {
@@ -50,7 +46,6 @@ function buildQueryFromFilter(filter = {}) {
     });
   }
 
-  // 🔍 Filtro por género (JSON_CONTAINS en genero)
   if (filter.genero) {
     const generos = toArray(filter.genero).map(slugify);
     generos.forEach(g => {
@@ -63,7 +58,6 @@ function buildQueryFromFilter(filter = {}) {
     });
   }
 
-  // 🔍 Agregar condiciones acumuladas al WHERE
   if (andConditions.length) {
     where[Op.and] = andConditions;
   }
@@ -71,23 +65,18 @@ function buildQueryFromFilter(filter = {}) {
   return where;
 }
 
-// FUNCIÓN AUXILIAR DE CLOUDINARY
 async function deleteCloudinaryImages(urls = []) {
     if (!urls || urls.length === 0) return;
 
-    // 1. Extraer los Public IDs de las URLs (ej: 'clavestreetwear/productos/imagen-12345')
     const publicIds = urls.map(url => {
-        // Asegurarse de que solo procesamos URLs válidas de Cloudinary
         if (!url || !url.includes('clavestreetwear/productos')) return null; 
         
         const parts = url.split('/upload/')[1];
         if (!parts) return null;
         
-        // Busca la parte de la URL que contiene la carpeta 'clavestreetwear'
         const index = parts.indexOf('clavestreetwear');
         if (index === -1) return null;
 
-        // Extrae el Public ID completo (sin la extensión)
         const publicIdWithExtension = parts.substring(index);
         const publicId = publicIdWithExtension.split('.').slice(0, -1).join('.');
 
@@ -96,7 +85,6 @@ async function deleteCloudinaryImages(urls = []) {
 
     if (publicIds.length === 0) return;
 
-    // 2. Eliminar de Cloudinary
     try {
         await cloudinary.api.delete_resources(publicIds);
     } catch (error) {
@@ -124,13 +112,13 @@ export class Calzados {
     const sizesWhere = {};
     if (filter.size) {
       sizesWhere.size = {
-        [Op.in]: toArray(filter.size).map(String) // normaliza todo a string
+        [Op.in]: toArray(filter.size).map(String) 
       };
     }
     return Product.findAll({
       where: {
-        category: "calzados", // Fija la categoría
-        ...where, // Añade los filtros dinámicos
+        category: "calzados", 
+        ...where,
       },
       include: [{
         model: Variant,
@@ -169,12 +157,10 @@ export class Calzados {
     order: [["createdAt", "DESC"]]
   });
 
-  // 💥 Aquí es donde procesas los datos para asegurarte de que las imágenes son arrays
   return productos.map(p => {
     const productData = p.toJSON();
     if (Array.isArray(productData.variants)) {
       productData.variants = productData.variants.map(v => {
-        // Convierte la cadena JSON en un array de JavaScript
         if (typeof v.images === 'string') {
           try {
             v.images = JSON.parse(v.images);
@@ -191,21 +177,18 @@ export class Calzados {
   }
 
   static async CreateCalzados(data) {
-  // Normalizamos los campos que deben ser arrays
   const types = normalizeToArray(data.types);
   const typeSlugs = types.map(type => slugify(type));
   const genero = normalizeToArray(data.genero);
 
   const { variants, ...base } = data;
 
-  // Crear el producto con los arrays normalizados
   const product = await Product.create({
     ...base,
     category: "calzados",
     types,
     typeSlugs,
     genero,
-    // Si hay brand, también generar brandSlug
     ...(data.brand && { brandSlug: slugify(data.brand) })
   });
 
@@ -213,7 +196,6 @@ export class Calzados {
     for (const variant of variants) {
       const { sizes, ...restVariant } = variant;
 
-      // 🔹 Normalizar imágenes ANTES de guardar
       let images = Array.isArray(restVariant.images) ? restVariant.images : [];
 
       const nuevaVariante = await Variant.create({
@@ -237,8 +219,6 @@ export class Calzados {
   static async UpdateCalzados(data, id) {
     const calzado = await Product.findByPk(id);
     if (!calzado) return null;
-
-    // Normalizar arrays si están presentes
     const normalizedData = { ...data };
     if (data.types) {
       normalizedData.types = normalizeToArray(data.types);
@@ -259,7 +239,6 @@ export class Calzados {
     const calzado = await Product.findByPk(id);
     if (!calzado) return null;
 
-    // Normalizar arrays para replace también
     const normalizedData = { ...data };
     if (data.types) {
       normalizedData.types = normalizeToArray(data.types);
@@ -276,10 +255,9 @@ export class Calzados {
     return this.GetCalzadosForID(id);
   }
 
-// --- MODIFICADO: DeleteCalzados ahora borra imágenes de Cloudinary ---
   static async DeleteCalzados(id) {
     const calzado = await Product.findByPk(id, {
-        // Incluimos las variantes para poder obtener las URLs de las imágenes
+
         include: [{ 
             model: Variant, 
             as: "variants" 
@@ -287,7 +265,6 @@ export class Calzados {
     });
     if (!calzado) return null;
 
-    // 1. RECOLECTAR TODAS LAS URLS DE IMAGENES (Portada + Variantes)
     const allUrls = [];
     
     if (calzado.coverImage) {
@@ -301,17 +278,14 @@ export class Calzados {
         });
     }
 
-    // 2. LLAMAR A LA FUNCION DE BORRADO DE CLOUDINARY
     await deleteCloudinaryImages(allUrls);
 
-    // 3. ELIMINAR DE LA BASE DE DATOS (MySQL)
+
     await Variant.destroy({ where: { productId: id } });
     await calzado.destroy();
     return true;
   }
-// -------------------------------------------------------------------
 
-  // VARIANTES
   static async AddVariantToProduct(productId, { color, colorCode, images = [], sizes = [] }) {
     const product = await Product.findByPk(productId, { include: [{ model: Variant, as: "variants" }] });
     if (!product) return null;
@@ -344,22 +318,20 @@ export class Calzados {
     return this.GetCalzadosForID(productId);
   }
 
-// --- MODIFICADO: RemoveImageFromVariant ahora borra la imagen de Cloudinary ---
   static async RemoveImageFromVariant(productId, color, image) {
     const cSlug = slugify(decodeURIComponent(color));
     const variant = await Variant.findOne({ where: { productId, colorSlug: cSlug } });
     if (!variant) return null;
 
-    // 1. Elimina el archivo físico de Cloudinary
-    await deleteCloudinaryImages([image]); // Le pasamos la URL a borrar
+    await deleteCloudinaryImages([image]); 
 
-    // 2. Elimina la URL de la base de datos
+
     const imgs = (variant.images || []).filter(img => img !== image);
     await variant.update({ images: imgs });
     
     return this.GetCalzadosForID(productId);
   }
-// -----------------------------------------------------------------------------
+
 
   static async UpdateVariant(productId, color, data) {
     const cSlug = slugify(color);
@@ -382,24 +354,23 @@ export class Calzados {
     return this.GetCalzadosForID(productId);
   }
 
-// --- MODIFICADO: DeleteVariant ahora borra imágenes de Cloudinary ---
   static async DeleteVariant(productId, color) {
     const cSlug = slugify(color);
     const variant = await Variant.findOne({ where: { productId, colorSlug: cSlug } });
     if (!variant) return null;
     
-    // 1. RECOLECTAR URLS DE ESTA VARIANTE
+ 
     const variantUrls = Array.isArray(variant.images) ? variant.images : [];
 
-    // 2. ELIMINAR IMAGENES DE CLOUDINARY
+
     await deleteCloudinaryImages(variantUrls);
 
-    // 3. ELIMINAR DE LA BASE DE DATOS (MySQL)
+
     await Size.destroy({ where: { variantId: variant.id } });
     await variant.destroy();
     return this.GetCalzadosForID(productId);
   }
-// -------------------------------------------------------------------
+
 
   static async DecrementStock(productId, color, size, qty) {
     const cSlug = slugify(color);

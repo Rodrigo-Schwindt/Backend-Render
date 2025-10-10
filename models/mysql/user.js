@@ -3,7 +3,7 @@ import { sequelize } from "../../config/mysql.js";
 import bcrypt from 'bcrypt';
 import crypto from "crypto";
 
-// Modelo Sequelize
+
 export const UserModel = sequelize.define("User", {
   mail:            { type: DataTypes.STRING, unique: true, allowNull: false },
   password:        { type: DataTypes.STRING, allowNull: false },
@@ -53,7 +53,7 @@ export class User {
       type: assignedType,
       isVerified: false,
       verificationToken,
-      verificationExpires: new Date(Date.now() + 1000 * 60 * 60) // 1 hora
+      verificationExpires: new Date(Date.now() + 1000 * 60 * 60) 
     });
 
     return {
@@ -89,10 +89,10 @@ export class User {
     if (!user) throw new Error("Usuario no encontrado");
     if (user.isVerified) throw new Error("El usuario ya está verificado");
 
-    // Si token expiró o no existe, genera uno nuevo
+
     if (!user.verificationToken || !user.verificationExpires || user.verificationExpires < new Date()) {
       user.verificationToken = crypto.randomBytes(32).toString("hex");
-      user.verificationExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
+      user.verificationExpires = new Date(Date.now() + 1000 * 60 * 60); 
       await user.save();
     }
 
@@ -108,7 +108,7 @@ export class User {
     if (!user) throw new Error("No existe ese usuario.");
     const resetToken = crypto.randomBytes(32).toString("hex");
     user.verificationToken = resetToken;
-    user.verificationExpires = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
+    user.verificationExpires = new Date(Date.now() + 1000 * 60 * 60); 
     await user.save();
     return { user, resetToken };
   }
@@ -138,7 +138,7 @@ export class User {
         googleId,
         isVerified: true,
         type: 'user',
-        password: await bcrypt.hash(crypto.randomBytes(10).toString("hex"), 10) // random password
+        password: await bcrypt.hash(crypto.randomBytes(10).toString("hex"), 10) 
       });
     } else if (!user.googleId) {
       user.googleId = googleId;

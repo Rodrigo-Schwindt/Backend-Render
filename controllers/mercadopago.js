@@ -1,15 +1,12 @@
-// src/controllers/mercadopago.js
-
 import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
-// 🚨 IMPORTACIÓN: Mantenemos la ruta que indicas.
 import { validateCartItems } from '../models/mysql/cart.js'; 
 
-let client; // Cliente configurado de Mercado Pago
-let preferenceClient; // Cliente para manejar preferencias
-let paymentClient; // Cliente para manejar pagos
+let client; 
+let preferenceClient;
+let paymentClient; 
 let initializationPromise;
 
-// Función para inicializar el SDK de Mercado Pago
+
 function setupMercadoPago() {
     initializationPromise = (async () => {
         try {
@@ -20,7 +17,6 @@ function setupMercadoPago() {
                 throw new Error("MP_ACCESS_TOKEN no configurado");
             }
 
-            // ✅ Configuración moderna del SDK (v2.0+)
             client = new MercadoPagoConfig({
                 accessToken: MP_ACCESS_TOKEN,
                 options: {
@@ -28,7 +24,6 @@ function setupMercadoPago() {
                 }
             });
 
-            // Inicializar los clientes específicos
             preferenceClient = new Preference(client);
             paymentClient = new Payment(client);
 
@@ -41,10 +36,9 @@ function setupMercadoPago() {
     })();
 }
 
-// Llamada a la función de configuración
+
 setupMercadoPago();
 
-// Función de validación
 const checkSDK = (res) => {
     if (!client || !preferenceClient || !paymentClient) {
         res.status(503).json({ error: "El servicio de pagos aún no está disponible." });
@@ -54,9 +48,8 @@ const checkSDK = (res) => {
 };
 
 
-// --- CONTROLADOR EXISTENTE: CREAR PREFERENCIA (PARA CHECKOUT PRO) ---
 export const createPreference = async (req, res) => {
-    // Esperar la inicialización
+
     if (initializationPromise) {
         try {
             await initializationPromise;
@@ -69,7 +62,6 @@ export const createPreference = async (req, res) => {
 
     const { items: cartItems, customer, shipping_cost, order_id } = req.body; 
 
-    // 🚨 PASO DE SEGURIDAD: VALIDAR y OBTENER PRECIOS REALES antes de crear la preferencia
     try {
         const validationResult = await validateCartItems(cartItems);
 
@@ -81,7 +73,6 @@ export const createPreference = async (req, res) => {
             });
         }
         
-        // Mapear los ítems VALIDADOS para Mercado Pago
         const mp_items = validationResult.items.map(item => ({
             title: item.title,
             unit_price: Number(item.price),
@@ -90,7 +81,7 @@ export const createPreference = async (req, res) => {
         }));
 
         const preferenceBody = {
-            items: mp_items, // ✅ Usamos los ítems con precios de la DB
+            items: mp_items, 
             payer: {
                 email: customer.email,
                 name: customer.name
@@ -105,7 +96,6 @@ export const createPreference = async (req, res) => {
             external_reference: order_id || `temp-ref-${Date.now()}`
         };
 
-        // ✅ Usar el cliente de preferencias
         const response = await preferenceClient.create({ body: preferenceBody });
 
         res.status(200).json({ preferenceId: response.id });
@@ -116,9 +106,7 @@ export const createPreference = async (req, res) => {
     }
 };
 
-// --- CONTROLADOR CORREGIDO: PROCESAR PAGO (PARA PAYMENT BRICK) ---
 export const processPayment = async (req, res) => {
-    // Esperar la inicialización
     if (initializationPromise) {
         try {
             await initializationPromise;
@@ -130,10 +118,8 @@ export const processPayment = async (req, res) => {
     if (!checkSDK(res)) return;
 
     try {
-        // Obtenemos los ítems del carrito y los datos de pago
         const { items: cartItems, transaction_amount, ...paymentData } = req.body;
 
-        // 🚨 PASO CRÍTICO DE SEGURIDAD: RE-VALIDAR Y OBTENER EL MONTO FINAL SEGURO
         const validationResult = await validateCartItems(cartItems);
         
         if (!validationResult.isValid) {
@@ -144,7 +130,6 @@ export const processPayment = async (req, res) => {
             });
         }
         
-        // --- 🔑 VERIFICACIÓN DE FRAUDE: COMPARAR MONTOS ---
         const serverAmount = validationResult.totalPrice.toFixed(2);
         const clientAmount = Number(transaction_amount).toFixed(2);
         
@@ -155,14 +140,12 @@ export const processPayment = async (req, res) => {
             });
         }
         
-        // El monto que usaremos para el cobro es el calculado por el servidor (transactionAmount)
         const amountToCharge = validationResult.totalPrice; 
 
-        // Crear el pago con los datos del brick y el MONTO SEGURO
         const payment = await paymentClient.create({
             body: {
-                transaction_amount: amountToCharge, // ✅ MONTO SEGURO
-                token: paymentData.token, // Token de la tarjeta generado por el Brick
+                transaction_amount: amountToCharge, 
+                token: paymentData.token, 
                 description: paymentData.description || 'Compra en Clave Streetwear',
                 installments: paymentData.installments,
                 payment_method_id: paymentData.payment_method_id,
@@ -181,7 +164,6 @@ export const processPayment = async (req, res) => {
 
         console.log('💳 Pago procesado:', payment);
 
-        // Responder al frontend con el resultado
         res.status(200).json({
             status: payment.status,
             status_detail: payment.status_detail,
@@ -189,11 +171,9 @@ export const processPayment = async (req, res) => {
             external_reference: payment.external_reference
         });
 
-        // Si el pago fue aprobado, actualizar la base de datos
+
         if (payment.status === 'approved') {
             console.log(`✅ Pago aprobado. ID: ${payment.id}`);
-            // [ACTUALIZAR BASE DE DATOS Y STOCK AQUÍ]
-            // Usa validationResult.items para saber qué productos y qué cantidad descontar.
         }
 
     } catch (error) {
@@ -205,7 +185,6 @@ export const processPayment = async (req, res) => {
     }
 };
 
-// Webhook (mantenerlo para notificaciones asíncronas)
 export const receiveWebhook = async (req, res) => {
     if (initializationPromise) {
         try {
@@ -244,8 +223,6 @@ export const receiveWebhook = async (req, res) => {
 
             if (status === 'approved') {
                 console.log(`✅ Pago aprobado vía webhook: ${externalReference}`);
-                // [ACTUALIZAR BASE DE DATOS SI NO SE HIZO ANTES]
-                // Aquí deberías realizar la disminución de stock y la creación de la orden final
             }
         }
     } catch (error) {

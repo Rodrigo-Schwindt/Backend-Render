@@ -4,13 +4,11 @@ function toArray(val) { if (val == null) return []; return Array.isArray(val) ? 
 function normalizeIncomingBody(raw = {}) {
   const body = { ...raw };
 
-  // Normalizar tipo → types
   if (body.tipo && !body.types) {
     body.types = toArray(body.tipo);
     delete body.tipo;
   }
 
-  // Normalizar imágenes principales del producto
   if (body.images) {
     if (typeof body.images === "string") {
       try {
@@ -29,7 +27,6 @@ function normalizeIncomingBody(raw = {}) {
     }
   }
 
-  // Normalizar variantes
   if (typeof body.variants === "string") {
     try {
       body.variants = JSON.parse(body.variants);
@@ -53,13 +50,11 @@ function normalizeIncomingBody(raw = {}) {
 
   if (Array.isArray(body.variants)) {
     body.variants = body.variants.map((v) => {
-      // 🔹 Normalizar imágenes de cada variante
-      // Asumimos que si viene es un array, o lo hacemos uno vacío si no.
       let images = Array.isArray(v.images) ? v.images : []; 
       
       return {
         ...v,
-        images, // Ya es un array
+        images,
         sizes: Array.isArray(v.sizes)
           ? v.sizes.map((s) => ({
               size: String(s.size),
@@ -74,16 +69,9 @@ function normalizeIncomingBody(raw = {}) {
   return body;
 }
 
-/**
- * Normaliza las imágenes de las variantes de un producto para asegurar
- * que siempre sean un array, incluso si la base de datos las devuelve como una cadena de texto JSON.
- * @param {object} product El objeto del producto.
- * @returns {object} El objeto del producto con las imágenes normalizadas.
- */
 function normalizeProductVariants(product) {
   if (product && Array.isArray(product.variants)) {
     product.variants = product.variants.map(variant => {
-      // Intenta parsear la cadena de imágenes si es necesario
       if (typeof variant.images === 'string') {
         try {
           variant.images = JSON.parse(variant.images);
@@ -91,7 +79,6 @@ function normalizeProductVariants(product) {
           variant.images = [variant.images];
         }
       }
-      // Asegúrate de que siempre sea un array
       if (!Array.isArray(variant.images)) {
         variant.images = [variant.images];
       }
@@ -138,14 +125,12 @@ async create(req, res) {
   try {
     const body = normalizeIncomingBody(req.body);
     
-    // Imagen de portada (como siempre)
     if (req.fileUrl) body.coverImage = req.fileUrl;
 
-    // NUEVO: Integrar las URLs de imágenes de variantes procesadas
     if (req.variantImageUrls && body.variants) {
       body.variants = body.variants.map((variant, index) => ({
         ...variant,
-        images: req.variantImageUrls[index] || [] // Asignar las URLs procesadas
+        images: req.variantImageUrls[index] || [] 
       }));
     }
 
@@ -186,7 +171,6 @@ async create(req, res) {
   async delete(req, res) {
     const { id } = req.params;
     try {
-      // Aquí puedes borrar archivos si tienes imágenes físicas...
       const deleted = await Accesorios.DeleteAccesorios(id);
       if (!deleted) return res.status(404).json({ message: "Producto no encontrado" });
       res.json({ message: "Producto eliminado", id });

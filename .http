@@ -65,7 +65,7 @@ Content-Type: application/json
 }
 
 ###
-# Crear producto de ROPA (JSON, sin imagen de portada)
+
 POST http://localhost:3010/ropa
 Content-Type: application/json
 
@@ -210,6 +210,6 @@ Content-Type: application/json
     }
   ]
 }
-### 🟢 Filtrar combinado (ropa femenina, marca Adidas, talla 42)
+### 
 GET http://localhost:3010/filter?category=ropa&genero=femenino&brand=Topper&size=L
 Accept: application/json

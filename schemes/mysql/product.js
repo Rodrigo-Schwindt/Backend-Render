@@ -8,15 +8,15 @@ export const Product = sequelize.define("Product", {
   sku:         { type: DataTypes.STRING },
   brand:       { type: DataTypes.STRING },
   brandSlug:   { type: DataTypes.STRING },
-  types:       { type: DataTypes.JSON },    // Array de strings
-  typeSlugs:   { type: DataTypes.JSON },    // Array de strings
-  genero:      { type: DataTypes.JSON },    // Array de strings
+  types:       { type: DataTypes.JSON },   
+  typeSlugs:   { type: DataTypes.JSON },   
+  genero:      { type: DataTypes.JSON },   
   category:    { type: DataTypes.STRING, allowNull: false },
   coverImage:  { type: DataTypes.STRING },
   description: { type: DataTypes.TEXT },
 
-  peso:        { type: DataTypes.FLOAT },   // en kg
-  profundidad: { type: DataTypes.FLOAT },   // en cm
+  peso:        { type: DataTypes.FLOAT },   
+  profundidad: { type: DataTypes.FLOAT },   
   ancho:       { type: DataTypes.FLOAT },
   alto:        { type: DataTypes.FLOAT }
 }, {

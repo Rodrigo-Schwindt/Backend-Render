@@ -62,13 +62,11 @@ function normalizeIncomingBody(raw = {}) {
 
   if (Array.isArray(body.variants)) {
     body.variants = body.variants.map((v) => {
-      // 🔹 Normalizar imágenes de cada variante
-      // Asumimos que si viene es un array, o lo hacemos uno vacío si no.
       let images = Array.isArray(v.images) ? v.images : []; 
       
       return {
         ...v,
-        images, // Ya es un array
+        images, 
         sizes: Array.isArray(v.sizes)
           ? v.sizes.map((s) => ({
               size: String(s.size),
@@ -82,14 +80,11 @@ function normalizeIncomingBody(raw = {}) {
 
   return body;
 }
-/**
- * Normaliza las imágenes de las variantes de un producto para asegurar
- * que siempre sean un array, incluso si la base de datos las devuelve como una cadena de texto JSON.
- */
+
 function normalizeProductVariants(product) {
   if (product && Array.isArray(product.variants)) {
     product.variants = product.variants.map(variant => {
-      // Intenta parsear la cadena de imágenes si es necesario
+
       if (typeof variant.images === 'string') {
         try {
           variant.images = JSON.parse(variant.images);
@@ -97,7 +92,6 @@ function normalizeProductVariants(product) {
           variant.images = [variant.images];
         }
       }
-      // Asegúrate de que siempre sea un array
       if (!Array.isArray(variant.images)) {
         variant.images = [variant.images];
       }
@@ -111,7 +105,6 @@ export const ropaController = {
   async getAll(req, res) {
     try {
       const items = await Ropa.GetRopa();
-      // Mapea sobre cada item para normalizar las variantes antes de enviarlos
       const normalizedItems = items.map(normalizeProductVariants);
       res.status(200).json(normalizedItems);
     } catch (e) {
@@ -142,7 +135,6 @@ export const ropaController = {
     try {
       const item = await Ropa.GetRopaForID(req.params.id);
       if (!item) return res.status(404).json({ message: "Producto no encontrado" });
-      // Normaliza un solo item
       const normalizedItem = normalizeProductVariants(item);
       res.status(200).json(normalizedItem);
     } catch (e) {
@@ -155,7 +147,6 @@ async create(req, res) {
     const body = normalizeIncomingBody(req.body);
     if (req.fileUrl) body.coverImage = req.fileUrl;
 
-    // Integrar las URLs de imágenes de variantes procesadas
     if (req.variantImageUrls && body.variants) {
       body.variants = body.variants.map((variant, index) => ({
         ...variant,
@@ -199,19 +190,16 @@ async create(req, res) {
 async delete(req, res) {
   const { id } = req.params;
   try {
-    // 1. Obtener las URLs de las imágenes ANTES de eliminar el registro de la DB
     const imageUrls = await Ropa.getAllImageUrls(id);
     if (!imageUrls) {
       return res.status(404).json({ message: "Producto no encontrado" });
     }
 
-    // 2. Eliminar el registro del producto y sus variantes de la base de datos
     const deleted = await Ropa.DeleteRopa(id);
     if (!deleted) {
       return res.status(404).json({ message: "Producto no encontrado" });
     }
 
-    // 3. Eliminar las imágenes del sistema de archivos
     for (const url of imageUrls) {
       const fileName = path.basename(url);
       const filePath = path.join(process.cwd(), "uploads", fileName);
@@ -219,7 +207,6 @@ async delete(req, res) {
         await fs.unlink(filePath);
         console.log(`✅ Imagen eliminada: ${filePath}`);
       } catch (err) {
-        // Ignorar el error si el archivo ya no existe (ENOENT)
         if (err.code !== 'ENOENT') {
           console.error(`❌ Error al eliminar imagen ${filePath}:`, err);
         }
@@ -232,7 +219,6 @@ async delete(req, res) {
   }
 },
 
-  // 🚀 Nuevo
   async getTypesBrands(req, res) {
     try {
       const result = await Ropa.getAllTypesAndBrands();
@@ -242,7 +228,7 @@ async delete(req, res) {
     }
   },
 
-  // 🚀 Nuevo
+
   async updateCover(req, res) {
     try {
       const { id } = req.params;
