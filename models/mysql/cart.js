@@ -24,7 +24,7 @@ export const validateCartItems = async (items) => {
         
 
         const product = await Product.findByPk(productId, {
-            attributes: ['id', 'title', 'price', 'active'], 
+            attributes: ['id', 'title', 'price'], 
             include: [{
                 model: Variant,
                 as: "variants",
@@ -36,12 +36,6 @@ export const validateCartItems = async (items) => {
                 }]
             }]
         });
-
-        if (!product || !product.active) {
-            errors.push(`Producto ID ${productId} no encontrado o inactivo.`);
-            isValid = false;
-            continue;
-        }
         
         const targetVariant = product.variants?.find(v => v.color === color);
         

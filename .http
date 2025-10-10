@@ -39,7 +39,20 @@ Content-Type: application/json
   "title": "EJEMPLO PATCH",
   "price": 29.99
 }
+### Validar carrito
+POST https://backendclavestreetwear.onrender.com/cart/validate
+Content-Type: application/json
 
+{
+  "items": [
+    {
+      "productId": 1,
+      "quantity": 2,
+      "size": "M",
+      "color": "Negro"
+    }
+  ]
+}
 ###
 POST http://localhost:3010/user/register
 Content-Type: application/json
