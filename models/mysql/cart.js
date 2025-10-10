@@ -36,6 +36,12 @@ export const validateCartItems = async (items) => {
                 }]
             }]
         });
+
+        if (!product.variants || product.variants.length === 0) {
+            errors.push(`El producto ${product.title} no tiene variantes disponibles.`);
+            isValid = false;
+            continue;
+        }
         
         const targetVariant = product.variants?.find(v => v.color === color);
         
